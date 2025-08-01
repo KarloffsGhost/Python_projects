@@ -34,7 +34,7 @@ pip install gputil py-cpuinfo
 
 1. **Clone or download the script**:
    ```bash
-   git clone https://github.com/yourusername/llm-hardware-checker.git
+   git clone https://github.com/KarloffsGhost/llm-hardware-checker.git
    cd llm-hardware-checker
    ```
 
