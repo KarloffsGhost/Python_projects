@@ -1,7 +1,7 @@
 # 🤖 LLM Hardware Compatibility Checker
 
 [![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
-[![Cross Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/yourusername/llm-hardware-checker)
+[![Cross Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/KarloffsGhost/llm-hardware-checker)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A comprehensive Python tool that automatically detects your hardware specifications and determines which Large Language Models (LLMs) you can run locally. The tool searches the web for model requirements, analyzes various quantization options, and provides detailed setup instructions.
