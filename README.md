@@ -262,7 +262,7 @@ sudo python llm_hardware_checker.py
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see [CONTRIBUTE.md](CONTRIBUTE.md) for guidelines on:
+We welcome contributions! Please see [CONTRIBUTE.md]([CONTRIBUTE.md](https://github.com/KarloffsGhost/Python_projects/blob/main/contribute.md)) for guidelines on:
 - 🐛 Bug reports
 - ✨ Feature requests  
 - 🔧 Code contributions
