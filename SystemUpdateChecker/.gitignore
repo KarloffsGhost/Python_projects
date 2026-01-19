@@ -1,0 +1,26 @@
+# Log files
+*.log
+UpdateCheck_*.log
+
+# Windows thumbnail cache and system files
+Thumbs.db
+desktop.ini
+*.lnk
+
+# PowerShell profile backups
+*_profile.ps1
+
+# User-specific files (don't commit personal configs)
+*.bak
+*.tmp
+*.temp
+
+# IDE and editor files
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Windows specific
+$RECYCLE.BIN/
+System Volume Information/
