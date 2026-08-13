@@ -108,8 +108,12 @@ function Get-RecycleBinInfo {
         $totalSize = 0
         $itemCount = $items.Count
 
+        # $item.Size is the size in bytes. GetDetailsOf() was used here before,
+        # but it returns the localised display string from the size column
+        # ("1.2 MB"), and stripping non-digits from that yields 12.
         foreach ($item in $items) {
-            $totalSize += $recycleBin.GetDetailsOf($item, 2) -replace '[^\d]', '' -as [long]
+            $itemSize = $item.Size -as [long]
+            if ($itemSize) { $totalSize += $itemSize }
         }
 
         # Alternative method using COM
@@ -306,32 +310,58 @@ function Clear-BrowserCache {
     return $result
 }
 
-function Clear-RecycleBin {
+function Clear-SystemRecycleBin {
+    <#
+    .SYNOPSIS
+        Empties the Recycle Bin and reports the space actually reclaimed.
+    .DESCRIPTION
+        This function used to be named Clear-RecycleBin, which shadowed the
+        built-in cmdlet of the same name. Its own call to "Clear-RecycleBin
+        -Force" therefore resolved back to itself, failed on the unknown -Force
+        parameter, and silently fell through to the COM path - so the documented
+        primary path never ran at all.
+
+        BytesFreed is now measured from the difference before and after. It was
+        previously set to the size of the bin before deletion, so a failed or
+        partial empty still reported the full amount as reclaimed.
+    #>
     param([switch]$WhatIf)
 
     $result = @{ Success = $true; BytesFreed = 0; Errors = @() }
 
-    try {
-        $rbInfo = Get-RecycleBinInfo
-        $result.BytesFreed = $rbInfo.Size
+    $before = Get-RecycleBinInfo
 
-        if (-not $WhatIf) {
-            Clear-RecycleBin -Force -ErrorAction Stop
-        }
+    if ($WhatIf) {
+        $result.BytesFreed = $before.Size
+        return $result
+    }
+
+    try {
+        # Module-qualified so it cannot resolve back to this function.
+        Microsoft.PowerShell.Management\Clear-RecycleBin -Force -Confirm:$false -ErrorAction Stop
     }
     catch {
-        # Try alternative method
+        Write-Log "  Clear-RecycleBin failed ($($_.Exception.Message)); trying shell fallback" "Gray" $LogFile
+
         try {
-            if (-not $WhatIf) {
-                $shell = New-Object -ComObject Shell.Application
-                $recycleBin = $shell.NameSpace(0x0a)
-                $recycleBin.Items() | ForEach-Object { Remove-Item $_.Path -Recurse -Force -ErrorAction SilentlyContinue }
+            $shell = New-Object -ComObject Shell.Application
+            $recycleBin = $shell.NameSpace(0x0a)
+            foreach ($item in @($recycleBin.Items())) {
+                Remove-Item -LiteralPath $item.Path -Recurse -Force -ErrorAction SilentlyContinue
             }
         }
         catch {
             $result.Success = $false
-            $result.Errors += $_.Exception.Message
+            $result.Errors += "Recycle Bin could not be emptied: $($_.Exception.Message)"
+            return $result
         }
+    }
+
+    $after = Get-RecycleBinInfo
+    $result.BytesFreed = [Math]::Max(0, $before.Size - $after.Size)
+
+    if ($after.Count -gt 0) {
+        $result.Errors += "$($after.Count) item(s) remain in the Recycle Bin (in use or access denied)"
     }
 
     return $result
@@ -381,7 +411,7 @@ function Invoke-Cleaning {
 
         switch ($item.Key) {
             "RecycleBin" {
-                $cleanResult = Clear-RecycleBin -WhatIf:$WhatIf
+                $cleanResult = Clear-SystemRecycleBin -WhatIf:$WhatIf
             }
             "FirefoxCache" {
                 $cleanResult = Clear-FirefoxCache -WhatIf:$WhatIf
