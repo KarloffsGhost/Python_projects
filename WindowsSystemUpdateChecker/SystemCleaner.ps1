@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Continue"
-$ScriptVersion = "2.0.0"
+$ScriptVersion = "2.0.1"
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $LogFile = "$env:USERPROFILE\Desktop\SystemCleaner_$(Get-Date -Format 'yyyy-MM-dd').log"
 

@@ -1,8 +1,8 @@
 # SystemMaintenanceLib.psm1
 # Shared functions for System Maintenance Toolkit
-# Version: 2.0.0
+# Version: 2.1.0
 
-$script:LibVersion = "2.0.0"
+$script:LibVersion = "2.1.0"
 
 # ============================================
 # LOGGING FUNCTIONS

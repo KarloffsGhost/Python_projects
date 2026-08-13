@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Continue"
-$ScriptVersion = "2.0.0"
+$ScriptVersion = "2.1.0"
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $LogFile = "$env:USERPROFILE\Desktop\SystemMaintenance_$(Get-Date -Format 'yyyy-MM-dd').log"
 

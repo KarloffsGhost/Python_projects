@@ -1,6 +1,25 @@
-# System Maintenance Toolkit v2.0.0
+# System Maintenance Toolkit v2.1.0
 
 A comprehensive Windows system maintenance toolkit that combines update checking, system cleaning, driver management, and startup optimization - all in one place with a modern web dashboard.
+
+## What's New in v2.1.0
+
+Correctness and security release. See [CHANGELOG.md](CHANGELOG.md) for the full list.
+
+- **Accurate update counts** - Windows and driver updates were double-counted, and the application count was capped at 10 regardless of the real number
+- **Honest antivirus reporting** - the health check previously reported "signatures up to date" every run, even with Defender disabled
+- **Driver updates compared properly** - Windows Update offers drivers older than the ones you have; these are now detected by version and can be hidden
+- **Dashboard hardened** - fixed a remote code execution path, directory traversal, and unescaped output; all API routes now require a per-session token
+- **Tests** - `Tests\Test-Security.ps1` covers the path resolver, driver comparison and winget parser
+
+### Antivirus note
+
+`Dashboard\Start-Dashboard.ps1` opens a local HTTP listener and launches
+elevated processes. Behavioural AV engines flag that combination (Avast reports
+it as `IDP.Generic`), and the verdict is keyed to the file hash, so it can
+reappear after any edit to that file. If you use the dashboard, add an
+exception for that single file rather than the whole folder. The rest of the
+toolkit does not trigger it.
 
 ## What's New in v2.0.0
 
@@ -168,7 +187,22 @@ SystemMaintenance.ps1 -update
 SystemMaintenance.ps1 -clean
 SystemMaintenance.ps1 -full
 SystemMaintenance.ps1 -dashboard
+
+# Dashboard
+Dashboard\Start-Dashboard.ps1 -NoBrowser   # start without opening a browser
 ```
+
+## Tests
+
+```powershell
+powershell -ExecutionPolicy Bypass -File Tests\Test-Security.ps1
+```
+
+Covers the dashboard's static-file path resolver, the driver supersede
+comparison, and the winget table parser. These are tested as functions rather
+than over HTTP, because Windows `http.sys` rejects URLs containing `%2f` before
+a request reaches the script - an HTTP-level test would pass even if the
+resolver were broken.
 
 ## File Structure
 
@@ -196,16 +230,19 @@ SystemUpdateChecker/
 │   ├── index.html
 │   ├── css/dashboard.css
 │   └── js/app.js
+├── Tests/
+│   └── Test-Security.ps1         # Regression tests
 ├── Config/
 │   ├── ai-tools-paths.json       # AI tool paths
 │   ├── cleaner-rules.json        # Cleaning rules
-│   ├── dashboard-settings.json   # Dashboard config
-│   └── startup-backup/           # Disabled startup items
-├── Data/
-│   ├── last-scan.json            # Latest scan results
-│   └── scan-history.json         # Historical data
-├── Reports/                      # Generated HTML reports
-├── DriverBackups/                # Driver backup folders
+│   ├── dashboard-settings.json   # Dashboard config (port, auto-open)
+│   └── startup-backup/           # Disabled startup items (gitignored)
+├── Data/                         # Runtime state (gitignored)
+│   ├── system-cleaner-scan.json  # Latest cleaner scan
+│   ├── ai-toolchain-scan.json    # Latest AI toolchain scan
+│   └── scan-history.json         # Historical data for dashboard charts
+├── Reports/                      # Generated HTML reports (gitignored)
+├── DriverBackups/                # Driver backup folders (gitignored)
 └── README.md
 ```
 
@@ -270,7 +307,15 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ## Version History
 
-### v2.0.0 (Current)
+### v2.1.0 (Current)
+- Fixed update counts (double-counting, 10-item cap), winget parsing, encoding
+- Fixed antivirus check that always reported "up to date"
+- Replaced hardcoded driver skip with real version comparison
+- Fixed Recycle Bin cmdlet shadowing and false freed-space figures
+- Closed dashboard RCE, path traversal, CSRF and XSS
+- Added regression tests
+
+### v2.0.0
 - Added System Cleaner module
 - Added AI/ML Toolchain Cleaner
 - Added Driver Backup/Restore
