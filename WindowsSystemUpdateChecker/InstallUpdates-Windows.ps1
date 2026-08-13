@@ -36,10 +36,13 @@ $updatesToInstall = New-Object -ComObject Microsoft.Update.UpdateColl
 foreach ($update in $searchResult.Updates) {
     $install = "Yes"
 
-    # Skip drivers where user already has a newer version installed
-    # You can customize this section for your specific hardware
-    # Example: if ($update.Title -match "Specific.Driver.Name") { ... }
-    
+    # Skip older Intel driver if user has newer one
+    if ($update.Title -match "Intel.*Display.*32.0.101.6127") {
+        Write-Host "  [SKIP] $($update.Title)" -ForegroundColor Gray
+        Write-Host "         (You have a newer version already)" -ForegroundColor Gray
+        continue
+    }
+
     Write-Host "  [INSTALL] $($update.Title)" -ForegroundColor Green
     $updatesToInstall.Add($update) | Out-Null
 }

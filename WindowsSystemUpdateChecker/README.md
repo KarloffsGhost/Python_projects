@@ -1,343 +1,295 @@
-# Windows System Update Checker
+# System Maintenance Toolkit v2.0.0
 
-A simple, automated daily checker for Windows updates, driver updates, and application updates with smart recommendations.
+A comprehensive Windows system maintenance toolkit that combines update checking, system cleaning, driver management, and startup optimization - all in one place with a modern web dashboard.
 
-## 🎯 What It Does
+## What's New in v2.0.0
 
-- **Checks for updates** daily: Windows Updates, Drivers, and Applications (via winget)
-- **Explains what matters**: Instead of just listing updates, it tells you what to actually install and what to ignore
-- **Interactive installer**: Choose which apps to update with a simple menu
-- **Smart recommendations**: Distinguishes between critical security updates and optional updates
-- **Daily logs**: Creates a log file on your Desktop each day with findings
+- **Web Dashboard** - Beautiful browser-based UI to monitor and manage your system
+- **System Cleaner** - Clean temp files, browser caches, and Windows junk
+- **AI/ML Toolchain Cleaner** - Specialized cleaning for Ollama, Docker, pip, npm, NVIDIA caches
+- **Driver Backup/Restore** - Export and restore third-party drivers with System Restore points
+- **Startup Manager** - View, analyze, and optimize startup items
+- **HTML Reports** - Generate detailed system reports
+- **Unified Launcher** - One menu to access everything
 
-## 🚀 Quick Start
+## Quick Start
 
-1. Download/clone this repository to `C:\Users\YourName\SystemUpdateChecker`
-2. Double-click `UpdateTaskLocation-Admin.bat` to set up daily automatic checks (requires admin)
-3. Choose what time you want it to run daily (default: 9:00 AM)
-4. Done! It will check for updates automatically and create logs on your Desktop
-
-### Manual Usage
-
-Want to check now without scheduling?
-- Double-click `RunUpdateChecker.bat` - See what needs updating
-- Double-click `InstallUpdates-Interactive.bat` - Choose which apps to update
-
-## 📁 Files Included
-
-| File | Purpose |
-|------|---------|
-| `DailyUpdateChecker.ps1` | Main script that checks for all updates |
-| `RunUpdateChecker.bat` | Quick launcher to check for updates |
-| `InstallUpdates-Interactive.bat` | Choose which applications to update |
-| `InstallUpdates-Windows.bat` | Install Windows/Driver updates (admin required) |
-| `CheckTaskStatus.bat` | See if scheduled task is running |
-| `UpdateTaskLocation-Admin.bat` | Set up or change daily schedule time |
-| `HOW-TO-READ-UPDATES.txt` | Reference guide for interpreting results |
-| `README.txt` | Local documentation |
-
-## ✨ Key Features
-
-### Smart Analysis
-
-Instead of dumping raw update data, the checker explains:
-- ✅ **What to install** - Security updates, critical patches
-- ⚠️ **What's optional** - Non-critical updates
-- ❌ **What to ignore** - Updates you don't need (older versions, Windows built-in drivers)
-
-### Example Output
-
+### Main Launcher (Recommended)
 ```
-[1] CHECKING WINDOWS UPDATES...
-Found 2 Windows update(s):
-  Security Update for Windows (KB5xxxxx)
-  Driver Update - Display Adapter
-
-[2] CHECKING DRIVER UPDATES...
-Found 1 driver update(s):
-  Display Adapter - Version X.X.X.X
-
-[3] APPLICATION UPDATES...
-Found 15 application updates available:
-  Chrome, Git, Node.js, Visual Studio...
-
-========================================
-WHAT YOU SHOULD ACTUALLY DO
-========================================
-
-WINDOWS/DRIVER UPDATES:
-  You have 2 update(s) available
-  -> Review the list above for specific recommendations
-
-  Note: Old drivers (2006 dates) for USB/Bluetooth are usually
-  Windows built-in drivers and can be ignored unless you have issues
-
-APPLICATIONS TO UPDATE:
-  Found 15 application update(s)
-
-  Priority recommendations:
-    - Security/Browsers (Chrome, Firefox, Edge): RECOMMENDED
-    - Development tools: Update if you use them
-    - Other apps: Update when convenient
-
-========================================
-BOTTOM LINE
-========================================
-
-WHAT TO DO NOW:
-  1. Run: InstallUpdates-Interactive.bat
-  2. Choose [S] for Security apps (Chrome, VPN)
-  3. Or choose [C] to pick specific apps
-
-Everything else can be ignored!
+Double-click: SystemMaintenance.bat
 ```
 
-## 📊 What It Checks
+This opens the unified menu with all options:
+- Scan for updates
+- Clean system junk
+- Manage drivers
+- Optimize startup
+- Generate reports
+- Open web dashboard
 
-### Windows Updates
-- All available Windows Updates
-- Identifies critical vs optional
-- Filters out updates you don't need
+### Web Dashboard
+```
+Double-click: Dashboard\Start-Dashboard.bat
+```
 
-### Driver Updates
-- Available driver updates from Windows Update
-- Analyzes driver ages
-- Explains which old drivers are normal (Windows built-in from 2006)
-- Recommends which drivers actually need attention
+Opens a modern web interface at `http://localhost:8080` with:
+- Real-time system status
+- One-click actions
+- Historical charts
+- Quick access to all tools
 
-### Application Updates (via winget)
-- All apps managed by Windows Package Manager
-- Categorizes by priority:
-  - **Security/Browsers** (Chrome, Firefox, VPN) - Recommended
-  - **Development Tools** (Git, Node.js, Visual Studio) - If you use them
-  - **Utilities** (WinRAR, etc.) - Optional
+## All Tools
 
-### System Health
-- Device Manager errors
-- Windows Defender signature status
-- Explains what errors are normal vs need fixing
+| Launcher | Purpose |
+|----------|---------|
+| `SystemMaintenance.bat` | **Main launcher** - unified menu for everything |
+| `Dashboard\Start-Dashboard.bat` | Web-based dashboard UI |
+| `RunUpdateChecker.bat` | Scan for Windows, driver, and app updates |
+| `InstallUpdates-Interactive.bat` | Choose which apps to update |
+| `InstallUpdates-Windows.bat` | Install Windows/driver updates (admin) |
+| `SystemCleaner.bat` | Clean temp files and caches |
+| `AIToolchainCleaner.bat` | Clean AI/ML toolchain caches |
+| `DriverBackup-Admin.bat` | Backup/restore drivers (admin) |
+| `StartupManager.bat` | Manage startup items |
 
-## 🛠️ Installation
+## Features
 
-### Prerequisites
+### System Cleaner
+- Windows temp files (`%TEMP%`, `Windows\Temp`)
+- Windows Prefetch
+- Windows Update cache
+- Thumbnail cache
+- Browser caches (Chrome, Firefox, Edge)
+- Recycle Bin analysis
+- **Dry-run mode** - see what would be deleted before cleaning
+- **Interactive mode** - choose what to clean
+
+### AI/ML Toolchain Cleaner
+- **Ollama** - Model inventory, unused model detection, cleanup
+- **ComfyUI** - Temp files, `__pycache__` cleanup
+- **LM Studio** - Cache cleanup
+- **Docker** - Unused images, volumes, build cache
+- **NVIDIA** - Shader cache (DXCache, GLCache)
+- **pip** - Package cache
+- **npm** - Package cache
+- **Conda** - Package cache
+- **HuggingFace/PyTorch** - Cache analysis (manual cleanup)
+
+### Driver Backup/Restore
+- Export all third-party (non-Microsoft) drivers
+- Creates System Restore Point before operations
+- Timestamped backup folders
+- Restore individual or all drivers
+- View installed third-party drivers
+
+### Startup Manager
+- Registry Run keys (HKCU and HKLM)
+- Startup folders (User and All Users)
+- Scheduled tasks (logon triggers)
+- **Impact analysis** - High/Medium/Low/Essential ratings
+- **Category detection** - Security, Cloud Sync, Gaming, etc.
+- Disable with backup, re-enable later
+- Protects essential/security items
+
+### System Reports
+- Beautiful HTML reports with dark theme
+- System overview (CPU, RAM, Disk)
+- Update summary
+- Cleanable space analysis
+- Startup item count
+- Recommendations
+
+### Web Dashboard
+- Real-time system status cards
+- One-click scan and clean actions
+- Historical charts (space freed over time)
+- Quick access to all tools
+- Auto-refresh every 60 seconds
+
+## Menu Structure
+
+```
+SYSTEM MAINTENANCE TOOLKIT v2.0.0
+
+SCAN / CHECK (read-only)
+  [1] Scan for Updates (Windows + Drivers + Apps)
+  [2] Scan for Cleanable Items (System + AI/ML)
+  [3] Scan Everything (Full System Report)
+
+UPDATE (install updates)
+  [4] Update Windows & Drivers
+  [5] Update Applications (Interactive)
+  [6] Update ALL (Windows + Drivers + Apps)
+
+CLEAN (remove junk)
+  [7] Clean System (Temp, Cache, Browser)
+  [8] Clean AI/ML Toolchain (Ollama, Docker, pip, npm)
+  [9] Clean ALL (System + AI/ML)
+
+FULL MAINTENANCE
+  [F] FULL MAINTENANCE (Update ALL + Clean ALL)
+
+TOOLS
+  [D] Driver Backup/Restore
+  [S] Startup Manager
+  [R] Generate HTML Report
+  [W] Open Web Dashboard
+
+[Q] Quit
+```
+
+## Command Line Options
+
+All scripts support command-line arguments for automation:
+
+```powershell
+# System Cleaner
+SystemCleaner.ps1 -scan      # Scan only (no changes)
+SystemCleaner.ps1 -clean     # Clean all items
+SystemCleaner.ps1 -safe      # Clean safe items only
+SystemCleaner.ps1 -dryrun    # Show what would be cleaned
+
+# AI Toolchain Cleaner
+AIToolchainCleaner.ps1 -scan
+AIToolchainCleaner.ps1 -safe
+AIToolchainCleaner.ps1 -docker
+
+# Startup Manager
+StartupManager.ps1 -list
+StartupManager.ps1 -analyze
+
+# System Report
+SystemReport.ps1 -generate
+SystemReport.ps1 -notify
+
+# Main Launcher
+SystemMaintenance.ps1 -scan
+SystemMaintenance.ps1 -update
+SystemMaintenance.ps1 -clean
+SystemMaintenance.ps1 -full
+SystemMaintenance.ps1 -dashboard
+```
+
+## File Structure
+
+```
+SystemUpdateChecker/
+├── SystemMaintenance.bat         # Main launcher
+├── SystemMaintenance.ps1
+├── DailyUpdateChecker.ps1        # Update scanner
+├── InstallUpdates-Interactive.ps1
+├── InstallUpdates-Windows.ps1
+├── SystemCleaner.ps1             # System cleaner
+├── SystemCleaner.bat
+├── AIToolchainCleaner.ps1        # AI/ML cleaner
+├── AIToolchainCleaner.bat
+├── DriverBackup.ps1              # Driver backup/restore
+├── DriverBackup-Admin.bat
+├── StartupManager.ps1            # Startup manager
+├── StartupManager.bat
+├── SystemReport.ps1              # Report generator
+├── Modules/
+│   └── SystemMaintenanceLib.psm1 # Shared functions
+├── Dashboard/
+│   ├── Start-Dashboard.ps1       # Web server
+│   ├── Start-Dashboard.bat
+│   ├── index.html
+│   ├── css/dashboard.css
+│   └── js/app.js
+├── Config/
+│   ├── ai-tools-paths.json       # AI tool paths
+│   ├── cleaner-rules.json        # Cleaning rules
+│   ├── dashboard-settings.json   # Dashboard config
+│   └── startup-backup/           # Disabled startup items
+├── Data/
+│   ├── last-scan.json            # Latest scan results
+│   └── scan-history.json         # Historical data
+├── Reports/                      # Generated HTML reports
+├── DriverBackups/                # Driver backup folders
+└── README.md
+```
+
+## Configuration
+
+### AI Tools Paths (`Config/ai-tools-paths.json`)
+Customize paths for your AI tools if they're not in default locations:
+```json
+{
+    "Ollama": {
+        "ModelsPath": "D:\\AI\\ollama\\models"
+    }
+}
+```
+
+### Cleaner Rules (`Config/cleaner-rules.json`)
+Customize what gets cleaned automatically vs. requiring confirmation.
+
+### Dashboard Settings (`Config/dashboard-settings.json`)
+Change port, auto-refresh interval, notification settings.
+
+## Requirements
+
 - Windows 10/11
-- PowerShell (pre-installed on Windows)
-- Windows Package Manager (winget) - [Install from Microsoft Store](https://apps.microsoft.com/store/detail/app-installer/9NBLGGH4NNS1) if not already installed
+- PowerShell 5.1+ (pre-installed)
+- winget (for app updates) - [Install from Microsoft Store](https://apps.microsoft.com/store/detail/app-installer/9NBLGGH4NNS1)
+- Administrator rights for some features (driver backup, Windows updates)
 
-### Setup
+## Tips
 
-1. **Clone or download** this repository to your user folder:
-   ```
-   C:\Users\YourName\SystemUpdateChecker
-   ```
+1. **First run**: Use `SystemMaintenance.bat` and try option [3] for a full system scan
+2. **Regular maintenance**: Run [F] Full Maintenance weekly
+3. **AI developers**: Use [8] regularly to clean pip/npm caches
+4. **Before driver updates**: Use [D] to backup drivers first
+5. **Slow boot?**: Use [S] Startup Manager to analyze and optimize
 
-2. **Set up daily automatic checks** (optional):
-   - Right-click `UpdateTaskLocation-Admin.bat` and "Run as Administrator"
-   - Choose what time you want daily checks (e.g., 9:00 AM)
-   - Creates a Windows Task Scheduler task
+## Logs
 
-3. **Add antivirus exclusion** (if needed):
+All operations create logs on your Desktop:
+- `UpdateCheck_YYYY-MM-DD.log`
+- `SystemCleaner_YYYY-MM-DD.log`
+- `AIToolchainCleaner_YYYY-MM-DD.log`
+- `DriverBackup_YYYY-MM-DD.log`
+- `StartupManager_YYYY-MM-DD.log`
 
-   Some antivirus software may flag PowerShell scripts as suspicious (false positive).
+## Troubleshooting
 
-   **Option 1 - Windows Security GUI:**
-   - Open Windows Security → Virus & threat protection
-   - Manage settings → Exclusions → Add exclusion
-   - Add folder: `C:\Users\YourName\SystemUpdateChecker`
+**Dashboard won't start:**
+- Port 8080 may be in use - it will try ports 8080-8090
+- Check firewall settings
 
-   **Option 2 - PowerShell (run as admin):**
-   ```powershell
-   Add-MpPreference -ExclusionPath "C:\Users\YourName\SystemUpdateChecker"
-   ```
-
-## 📖 Usage
-
-### Daily Automatic Checks
-
-Once set up, the checker runs automatically each day at your chosen time. You'll know it ran because:
-- A log file appears on your Desktop: `UpdateCheck_2025-10-13.log`
-- Open the log to see what was found
-- Look for the "WHAT YOU SHOULD ACTUALLY DO" section at the bottom
-
-### Manual Checks
-
-**Check for updates anytime:**
-```
-Double-click: RunUpdateChecker.bat
-```
-
-**Install application updates interactively:**
-```
-Double-click: InstallUpdates-Interactive.bat
-```
-
-Choose from:
-- `[A]` Update ALL applications
-- `[S]` Update SECURITY apps only (recommended)
-- `[D]` Update DEVELOPMENT tools only
-- `[C]` Choose specific apps by number
-- `[N]` Don't update anything
-
-**Install Windows/Driver updates:**
-```
-Double-click: InstallUpdates-Windows.bat
-```
-(Requires administrator privileges)
-
-## 🔧 Managing the Scheduled Task
-
-### Check Status
-```
-Double-click: CheckTaskStatus.bat
-```
-
-Shows:
-- Is the task enabled?
-- When did it last run?
-- When will it run next?
-- Last run result
-
-### PowerShell Commands
-
-**View task:**
-```powershell
-Get-ScheduledTask -TaskName "DailySystemUpdateChecker"
-```
-
-**Run manually:**
-```powershell
-Start-ScheduledTask -TaskName "DailySystemUpdateChecker"
-```
-
-**Disable (pause automatic checks):**
-```powershell
-Disable-ScheduledTask -TaskName "DailySystemUpdateChecker"
-```
-
-**Enable (resume automatic checks):**
-```powershell
-Enable-ScheduledTask -TaskName "DailySystemUpdateChecker"
-```
-
-**Remove task completely:**
-```powershell
-Unregister-ScheduledTask -TaskName "DailySystemUpdateChecker" -Confirm:$false
-```
-
-**Change schedule time:**
-```
-Double-click: UpdateTaskLocation-Admin.bat
-```
-
-## 🤔 Understanding the Results
-
-### Common Scenarios
-
-**"Drivers from 2006-06-21"**
-- ✅ **Normal** - These are Windows inbox drivers (USB, Bluetooth stack, etc.)
-- These are maintained automatically through Windows Update
-- No action needed
-
-**"Driver update shows older version than installed"**
-- Check your current version first in Device Manager
-- If you have a newer version already, **ignore** this update
-- Windows Update cache can be outdated
-
-**"Error Code 22 - Device disabled"**
-- ✅ **Normal** - Not actually an error
-- The device is manually disabled by you
-- No action needed
-
-**"Error Code 52 - Unsigned driver"**
-- Usually antivirus or security software drivers
-- If the software works, **ignore** this
-
-**"30+ application updates available"**
-- **Priority 1:** Browsers (Chrome, Firefox, Edge) - Security important
-- **Priority 2:** Development tools you actually use
-- **Priority 3:** Everything else - update when convenient
-
-## 🛡️ Security & Privacy
-
-- **No data collection** - Everything runs locally on your machine
-- **Read-only checks** - The checker only reads system information
-- **Manual installation** - Updates are never installed automatically without your approval
-- **Open source** - You can review all scripts before running
-
-## ❓ FAQ
-
-**Q: Will this install updates automatically?**
-A: No. It only checks and reports. You must run the install scripts manually.
-
-**Q: Why does my antivirus flag this?**
-A: PowerShell scripts that check system settings can trigger heuristic detection (IDP.Generic). This is a false positive. Add the folder to your antivirus exclusions.
-
-**Q: Can I run this without Administrator privileges?**
-A: Yes for checking updates. Admin is only required for creating the scheduled task and installing Windows/Driver updates.
-
-**Q: Does this work on Windows 10?**
-A: Yes, tested on Windows 10 and 11.
-
-**Q: What if I don't have winget installed?**
-A: The checker will still work for Windows and Driver updates. Install [App Installer](https://apps.microsoft.com/store/detail/app-installer/9NBLGGH4NNS1) from Microsoft Store to enable application update checking.
-
-**Q: Can I customize the install location?**
-A: Yes, but you'll need to update the paths in `Setup-DailyUpdateTask.ps1` and `RunUpdateChecker.bat` to match your location.
-
-**Q: How do I uninstall?**
-A:
-1. Remove the scheduled task: `Unregister-ScheduledTask -TaskName "DailySystemUpdateChecker"`
-2. Delete the folder: `C:\Users\YourName\SystemUpdateChecker`
-3. Delete log files from Desktop: `UpdateCheck_*.log`
-
-## 🐛 Troubleshooting
-
-**Task not running:**
-- Open Task Scheduler (`Win + R` → `taskschd.msc`)
-- Find "DailySystemUpdateChecker"
-- Check "Last Run Result" (0x0 = success)
-- Verify it's enabled
-
-**No log files appearing:**
-- Run `CheckTaskStatus.bat` to verify task status
-- Manually run `RunUpdateChecker.bat` to test
-- Check antivirus hasn't quarantined the folder
-
-**PowerShell execution policy errors:**
+**Scripts won't run:**
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-**"Cannot find winget" error:**
+**winget not found:**
 - Install from Microsoft Store: [App Installer](https://apps.microsoft.com/store/detail/app-installer/9NBLGGH4NNS1)
 
-## 📝 License
+**Antivirus blocks scripts:**
+- Add folder to exclusions: `C:\Users\YourName\SystemUpdateChecker`
 
-MIT License - Feel free to use, modify, and distribute.
+## Version History
 
-## 🤝 Contributing
+### v2.0.0 (Current)
+- Added System Cleaner module
+- Added AI/ML Toolchain Cleaner
+- Added Driver Backup/Restore
+- Added Startup Manager
+- Added Web Dashboard
+- Added HTML Report Generator
+- Added unified launcher menu
+- Reorganized file structure
 
-Contributions welcome! Please feel free to submit a Pull Request.
+### v1.0.0
+- Initial release
+- Daily update checker
+- Interactive app updater
+- Windows update installer
 
-Ideas for contributions:
-- Support for other package managers (Chocolatey, Scoop)
-- Email notifications when critical updates are found
-- Web dashboard for viewing update history
-- Better driver age analysis
-- Integration with other update tools
+## License
 
-## 🙏 Acknowledgments
-
-- Uses Windows Update API for Windows/Driver checking
-- Uses winget (Windows Package Manager) for application updates
-- Built with PowerShell
-
-## 📞 Support
-
-For issues, questions, or suggestions:
-- Open an issue on GitHub
-- Check existing issues for solutions
+MIT License - Free to use and modify.
 
 ---
 
-**Note:** This tool provides information about available updates but does not replace official update mechanisms. Always verify critical updates through official channels.
+**System Maintenance Toolkit** - Keep your system clean, updated, and optimized.

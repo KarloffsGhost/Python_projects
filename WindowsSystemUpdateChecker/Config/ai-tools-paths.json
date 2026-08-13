@@ -1,0 +1,21 @@
+{
+    "Ollama": {
+        "ModelsPath": "",
+        "BlobsPath": "",
+        "ManifestsPath": "",
+        "_comment": "Leave empty to use defaults (~/.ollama/models)"
+    },
+    "ComfyUI": {
+        "TempPath": "",
+        "OutputPath": "",
+        "_comment": "Leave empty to use defaults (~/ComfyUI)"
+    },
+    "LMStudio": {
+        "CachePath": "",
+        "ModelsPath": "",
+        "_comment": "Leave empty to use defaults (~/.cache/lm-studio)"
+    },
+    "CustomPaths": {
+        "_comment": "Add any custom paths for your AI tools here"
+    }
+}

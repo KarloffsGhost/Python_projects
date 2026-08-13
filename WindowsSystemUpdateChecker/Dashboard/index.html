@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Maintenance Dashboard</title>
+    <link rel="stylesheet" href="/css/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>System Maintenance Dashboard</h1>
+                <div class="header-info">
+                    <span id="computerName">Loading...</span>
+                    <span class="separator">|</span>
+                    <span id="lastUpdated">--</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="refreshAll()">
+                    <span class="icon">&#8635;</span> Refresh
+                </button>
+            </div>
+        </header>
+
+        <!-- Status Banner -->
+        <div id="statusBanner" class="status-banner status-good">
+            <span class="status-icon">&#9989;</span>
+            <span id="statusText">System Status: Good</span>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="overview">Overview</button>
+            <button class="tab-btn" data-tab="updates">
+                Updates <span id="updatesTabBadge" class="tab-badge hidden">0</span>
+            </button>
+            <button class="tab-btn" data-tab="cleanable">
+                Cleanable <span id="cleanableTabBadge" class="tab-badge hidden">0</span>
+            </button>
+            <button class="tab-btn" data-tab="tools">Tools</button>
+        </div>
+
+        <!-- Tab Content: Overview -->
+        <div id="tab-overview" class="tab-content active">
+            <div class="stats-grid">
+                <!-- Windows Updates Card -->
+                <div class="card clickable" onclick="switchTab('updates')">
+                    <div class="card-header">
+                        <h2>Windows Updates</h2>
+                        <span class="card-icon">&#127760;</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="big-stat">
+                            <span id="windowsUpdatesCount" class="stat-value">--</span>
+                            <span class="stat-label">available</span>
+                        </div>
+                        <div id="criticalBadge" class="critical-badge hidden">
+                            <span class="critical-icon">&#9888;</span>
+                            <span id="criticalCount">0</span> CRITICAL
+                        </div>
+                    </div>
+                </div>
+
+                <!-- App Updates Card -->
+                <div class="card clickable" onclick="switchTab('updates')">
+                    <div class="card-header">
+                        <h2>App Updates</h2>
+                        <span class="card-icon">&#128230;</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="big-stat">
+                            <span id="appUpdatesCount" class="stat-value">--</span>
+                            <span class="stat-label">available</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cleanable Card -->
+                <div class="card clickable" onclick="switchTab('cleanable')">
+                    <div class="card-header">
+                        <h2>Cleanable</h2>
+                        <span class="card-icon">&#128465;</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="big-stat">
+                            <span id="totalCleanable" class="stat-value">--</span>
+                            <span class="stat-label">reclaimable</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Disk Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Disk Space</h2>
+                        <span class="card-icon">&#128190;</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="big-stat">
+                            <span id="diskPercent" class="stat-value">--</span>
+                            <span class="stat-label">free</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="diskProgress" class="progress-fill" style="width: 50%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="section">
+                <h2 class="section-title">Quick Actions</h2>
+                <div class="actions-grid">
+                    <button class="action-btn" onclick="switchTab('updates')">
+                        <span class="action-icon">&#128269;</span>
+                        <span class="action-text">View Updates</span>
+                    </button>
+                    <button class="action-btn" onclick="switchTab('cleanable')">
+                        <span class="action-icon">&#128465;</span>
+                        <span class="action-text">View Cleanable</span>
+                    </button>
+                    <button class="action-btn action-primary" onclick="launchFullMaintenance()">
+                        <span class="action-icon">&#9889;</span>
+                        <span class="action-text">Full Maintenance</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content: Updates -->
+        <div id="tab-updates" class="tab-content">
+            <!-- Windows Updates Section -->
+            <div class="detail-section">
+                <div class="detail-header">
+                    <h2>Windows & Driver Updates</h2>
+                    <div class="detail-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="selectAllWindows()">Select All</button>
+                        <button class="btn btn-primary btn-sm" onclick="installSelectedWindows()" id="installWindowsBtn" disabled>
+                            Install Selected
+                        </button>
+                    </div>
+                </div>
+                <div id="windowsUpdatesList" class="item-list">
+                    <div class="loading-placeholder">Loading Windows updates...</div>
+                </div>
+            </div>
+
+            <!-- App Updates Section -->
+            <div class="detail-section">
+                <div class="detail-header">
+                    <h2>Application Updates</h2>
+                    <div class="detail-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="selectAllApps()">Select All</button>
+                        <button class="btn btn-secondary btn-sm" onclick="selectSecurityApps()">Select Security/Browsers</button>
+                        <button class="btn btn-primary btn-sm" onclick="installSelectedApps()" id="installAppsBtn" disabled>
+                            Install Selected (<span id="selectedAppsCount">0</span>)
+                        </button>
+                    </div>
+                </div>
+                <div id="appUpdatesList" class="item-list">
+                    <div class="loading-placeholder">Loading app updates...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content: Cleanable -->
+        <div id="tab-cleanable" class="tab-content">
+            <div class="detail-section">
+                <div class="detail-header">
+                    <h2>Cleanable Items</h2>
+                    <div class="detail-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="selectAllSafe()">Select Safe Items</button>
+                        <button class="btn btn-secondary btn-sm" onclick="selectAllCleanable()">Select All</button>
+                        <button class="btn btn-primary btn-sm" onclick="cleanSelected()" id="cleanBtn" disabled>
+                            Clean Selected (<span id="selectedCleanSize">0 B</span>)
+                        </button>
+                    </div>
+                </div>
+                <div id="cleanableList" class="item-list">
+                    <div class="loading-placeholder">Loading cleanable items...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content: Tools -->
+        <div id="tab-tools" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">Maintenance Tools</h2>
+                <div class="tools-grid">
+                    <div class="tool-card" onclick="launchTool('updater')">
+                        <span class="tool-icon">&#128260;</span>
+                        <span class="tool-name">Interactive App Updater</span>
+                        <span class="tool-desc">Choose which apps to update with categories</span>
+                    </div>
+                    <div class="tool-card" onclick="launchTool('windows')">
+                        <span class="tool-icon">&#127760;</span>
+                        <span class="tool-name">Windows Update</span>
+                        <span class="tool-desc">Install Windows and driver updates</span>
+                    </div>
+                    <div class="tool-card" onclick="launchTool('cleaner')">
+                        <span class="tool-icon">&#128465;</span>
+                        <span class="tool-name">System Cleaner</span>
+                        <span class="tool-desc">Interactive temp file and cache cleaner</span>
+                    </div>
+                    <div class="tool-card" onclick="launchTool('ai-cleaner')">
+                        <span class="tool-icon">&#129302;</span>
+                        <span class="tool-name">AI/ML Cleaner</span>
+                        <span class="tool-desc">Clean Ollama, Docker, pip, npm caches</span>
+                    </div>
+                    <div class="tool-card" onclick="launchTool('drivers')">
+                        <span class="tool-icon">&#128190;</span>
+                        <span class="tool-name">Driver Backup</span>
+                        <span class="tool-desc">Backup and restore third-party drivers</span>
+                    </div>
+                    <div class="tool-card" onclick="launchTool('startup')">
+                        <span class="tool-icon">&#9889;</span>
+                        <span class="tool-name">Startup Manager</span>
+                        <span class="tool-desc">Manage startup programs and boot time</span>
+                    </div>
+                    <div class="tool-card" onclick="launchTool('report')">
+                        <span class="tool-icon">&#128202;</span>
+                        <span class="tool-name">Generate Report</span>
+                        <span class="tool-desc">Create detailed HTML system report</span>
+                    </div>
+                    <div class="tool-card" onclick="launchTool('full')">
+                        <span class="tool-icon">&#9889;</span>
+                        <span class="tool-name">Full Maintenance</span>
+                        <span class="tool-desc">Update everything + clean everything</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>System Maintenance Toolkit v2.0.0</p>
+        </footer>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden">
+        <span id="toastMessage"></span>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

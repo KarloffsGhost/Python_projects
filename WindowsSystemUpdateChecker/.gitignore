@@ -1,26 +1,22 @@
 # Log files
 *.log
-UpdateCheck_*.log
 
-# Windows thumbnail cache and system files
+# Windows thumbnail cache
 Thumbs.db
 desktop.ini
-*.lnk
 
 # PowerShell profile backups
 *_profile.ps1
 
 # User-specific files (don't commit personal configs)
-*.bak
-*.tmp
-*.temp
+UpdateCheck_*.log
 
-# IDE and editor files
-.vscode/
-.idea/
-*.suo
-*.user
+# Runtime state - machine-specific scan results, recreated on demand
+Data/
 
-# Windows specific
-$RECYCLE.BIN/
-System Volume Information/
+# Generated output - recreated on demand
+Reports/
+DriverBackups/
+
+# Backups of disabled startup entries (contains local paths and app names)
+Config/startup-backup/

@@ -1,0 +1,64 @@
+{
+    "SystemCleaner": {
+        "EnabledCategories": [
+            "WindowsTemp",
+            "UserTemp",
+            "Prefetch",
+            "WindowsUpdateCache",
+            "ThumbnailCache",
+            "WindowsErrorReports",
+            "ChromeCache",
+            "FirefoxCache",
+            "EdgeCache",
+            "RecycleBin"
+        ],
+        "SafeToAutoClean": [
+            "WindowsTemp",
+            "UserTemp",
+            "Prefetch",
+            "ThumbnailCache",
+            "ChromeCache",
+            "FirefoxCache",
+            "EdgeCache"
+        ],
+        "RequireConfirmation": [
+            "WindowsUpdateCache",
+            "RecycleBin",
+            "WindowsErrorReports"
+        ],
+        "ExcludePatterns": [
+            "*.log",
+            "recent.*"
+        ],
+        "MinFileAgeDays": 0
+    },
+    "AIToolchainCleaner": {
+        "EnabledCategories": [
+            "NVIDIAShaderCache",
+            "PipCache",
+            "NpmCache",
+            "Conda",
+            "ComfyUI",
+            "Docker"
+        ],
+        "SafeToAutoClean": [
+            "NVIDIAShaderCache",
+            "PipCache",
+            "NpmCache"
+        ],
+        "RequireConfirmation": [
+            "Ollama",
+            "LMStudio",
+            "HuggingFace",
+            "PyTorch",
+            "Docker"
+        ],
+        "OllamaUnusedDays": 30,
+        "DockerPruneOptions": {
+            "Images": true,
+            "Volumes": true,
+            "BuildCache": true,
+            "Networks": false
+        }
+    }
+}

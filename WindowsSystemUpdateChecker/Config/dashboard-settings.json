@@ -1,0 +1,21 @@
+{
+    "Server": {
+        "Port": 8080,
+        "MaxPort": 8090,
+        "AutoOpenBrowser": true
+    },
+    "Refresh": {
+        "AutoRefreshEnabled": true,
+        "AutoRefreshIntervalSeconds": 60
+    },
+    "Notifications": {
+        "EnableToastNotifications": true,
+        "NotifyOnCriticalUpdates": true,
+        "NotifyOnLowDiskSpace": true,
+        "LowDiskSpaceThresholdPercent": 10
+    },
+    "Display": {
+        "Theme": "dark",
+        "ShowHistoryDays": 7
+    }
+}
