@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.1.0] - 2026-08-12
 
+### Fixed (found by test-driving the dashboard live)
+- The dashboard's Overview tab always showed "0 Bytes reclaimable". Windows
+  PowerShell 5.1 - what every `.bat` launcher and the scheduled task actually
+  run under - does not resolve a hashtable key through `Measure-Object
+  -Property`; the non-terminating error left the total null on every real run
+  since January. This did not reproduce under PowerShell 7, which is why
+  developing and testing through `pwsh` never caught it. Fixed with a manual
+  sum instead of the cmdlet parameter, which works the same on both engines.
+- The same function reported "10 Windows updates" when exactly one was
+  present - PowerShell unwraps a single-item result, and `.Count` on the bare
+  hashtable that fell out returned its *key* count instead. All three
+  `Get-SystemStatus` sub-calls are now wrapped in `@()`.
+
 ### Security
 - **Dashboard remote code execution.** `/api/action/update` interpolated
   POSTed package ids into a PowerShell `-Command` string; an id containing a

@@ -8,12 +8,13 @@ When you run the update checker, here's what everything means:
 [1] WINDOWS UPDATES
 ───────────────────────────────────────────────────────────────
 
-Intel Corporation - Display - 32.0.101.6127
-   → IGNORE THIS - You have version 32.0.101.8132 which is NEWER
-   → Windows Update cache is outdated
-
-Any update marked [CRITICAL]
+Updates marked [CRITICAL]
    → INSTALL IMMEDIATELY - Security vulnerability
+
+Driver updates offered via Windows Update
+   → Check if you already have a newer version installed
+   → If your current version is newer, IGNORE the update
+   → Windows Update cache can sometimes be outdated
 
 Any other Windows update
    → INSTALL when convenient
@@ -22,58 +23,56 @@ Any other Windows update
 [2] DRIVER UPDATES
 ───────────────────────────────────────────────────────────────
 
-Same Intel driver as above
-   → IGNORE - You already have newer
-
-Any other driver
+Driver updates from Windows Update
    → INSTALL unless you're having no problems
+   → Always check your current driver version first
+   → Manufacturer websites often have newer drivers
 
 
 [3] DRIVER AGE ANALYSIS
 ───────────────────────────────────────────────────────────────
 
-Drivers from 2006-06-21 (USB, Bluetooth, Network Miniport)
-   ✓ NORMAL - These are Windows built-in drivers
+Drivers from 2006 (USB, Bluetooth, Network Miniport)
+   ✓ NORMAL - These are Windows built-in "inbox" drivers
    ✓ They're maintained through Windows Update automatically
    ✓ NO ACTION NEEDED
 
-NVIDIA Virtual Audio Device (2024-02-28)
-   ✓ NORMAL - Updates with your GPU driver
-   ✓ Your GPU driver is current, so this is fine
+GPU Audio Devices (Virtual Audio)
+   ✓ NORMAL - Updates with your graphics driver
+   ✓ If your GPU driver is current, these are fine
 
-Realtek Audio (2024 dates)
+Audio Drivers (Realtek, etc.)
    ✓ NORMAL - Less than a year old is fine
    ✓ Only update if having audio problems
 
-MediaTek Bluetooth Adapter (2024-12-10)
-   ✓ ACCEPTABLE - 8 months old
-   ✓ No newer version available via Windows Update
+Bluetooth Adapters
+   ✓ ACCEPTABLE - Under 1 year old is usually fine
    ✓ Only update if having Bluetooth issues
 
-Logitech USB Device (2021-08-24)
-   ⚠ OLD but probably fine
-   ✓ Only update if mouse/keyboard has issues
-   ✓ Visit logitech.com for updates if needed
+Peripheral Drivers (mice, keyboards, webcams)
+   ⚠ May be old but usually fine
+   ✓ Only update if device has issues
+   ✓ Visit manufacturer website for updates if needed
 
 
 [4] APPLICATION UPDATES
 ───────────────────────────────────────────────────────────────
 
-Google Chrome, Firefox, Edge
+Web Browsers (Chrome, Firefox, Edge)
    → UPDATE - Security patches are important
 
-Git, Node.js, Python, Visual Studio
+Development Tools (Git, Node.js, Python, Visual Studio, etc.)
    → UPDATE if you use them for development
    → SKIP if you don't know what they are
 
-NVIDIA CUDA Toolkit
-   → UPDATE if you do AI/GPU development
-   → SKIP if you don't use it
+GPU/CUDA Toolkits
+   → UPDATE if you do GPU-accelerated work
+   → SKIP if you don't use them
 
-WinRAR, 7-Zip, HWiNFO, AIDA64
+Utilities (WinRAR, 7-Zip, etc.)
    → UPDATE when convenient, not urgent
 
-Proton VPN
+VPN Software
    → UPDATE - Security improvements
 
 Any app showing Major Version change (e.g., 7.x → 8.0)
@@ -84,13 +83,14 @@ Any app showing Major Version change (e.g., 7.x → 8.0)
 [5] SYSTEM HEALTH
 ───────────────────────────────────────────────────────────────
 
-NETGEAR WiFi Adapter - Error Code 22
-   ✓ NORMAL - Device is manually disabled
-   ✓ NO ACTION NEEDED (it's supposed to be off)
+Error Code 22 - Device is disabled
+   ✓ NORMAL - Not actually an error
+   ✓ The device is manually disabled by you
+   ✓ NO ACTION NEEDED
 
-SASKUTIL / SASDIFSV - Error Code 52
-   ✓ NORMAL - SuperAntiSpyware drivers
-   ✓ Unsigned drivers, but if app works, ignore it
+Error Code 52 - Unsigned driver
+   ✓ NORMAL - Common with antivirus/security software
+   ✓ If the software works, ignore it
 
 Any other Error Code
    ⚠ CHECK - Open Device Manager to investigate
@@ -102,7 +102,7 @@ Any other Error Code
 
 INSTALL IMMEDIATELY:
    • Anything marked [CRITICAL]
-   • Chrome, Firefox, Edge updates
+   • Browser updates (Chrome, Firefox, Edge)
    • VPN software updates
 
 INSTALL WHEN CONVENIENT:
@@ -111,15 +111,15 @@ INSTALL WHEN CONVENIENT:
    • Any app with new features you want
 
 IGNORE COMPLETELY:
-   • Intel Display driver 32.0.101.6127 (you have newer)
-   • All 2006 dated drivers (USB, Bluetooth stack, etc.)
+   • Driver updates where you already have newer
+   • All 2006-dated drivers (USB, Bluetooth stack, etc.)
    • Virtual network adapters
    • Windows built-in components
 
 ONLY UPDATE IF HAVING PROBLEMS:
-   • Audio drivers (Realtek)
+   • Audio drivers
    • Bluetooth adapters
-   • Logitech device drivers
+   • Peripheral device drivers
 
 
 ═══════════════════════════════════════════════════════════════
@@ -142,11 +142,11 @@ Step 3: Ignore everything else unless having issues
                      SCHEDULED TASK
 ═══════════════════════════════════════════════════════════════
 
-Your checker runs daily at 9:05 AM
+Your checker runs daily at your configured time (default: 9:00 AM)
 
 You'll know it ran because:
    • A new log file appears on your Desktop
-   • Format: UpdateCheck_2025-10-13.log
+   • Format: UpdateCheck_YYYY-MM-DD.log
 
 To check if it's working:
    • Run: CheckTaskStatus.bat
