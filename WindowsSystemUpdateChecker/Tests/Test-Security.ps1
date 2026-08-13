@@ -94,10 +94,10 @@ Write-Host "Test-DriverUpdateSuperseded - version comparison" -ForegroundColor C
 
 $fakeInstalled = @(
     [PSCustomObject]@{
-        DeviceName    = 'Intel(R) Graphics'
-        DriverVersion = '32.0.101.8860'
+        DeviceName    = 'Example Display Adapter'
+        DriverVersion = '20.0.100.5000'
         DriverDate    = [DateTime]'2026-06-24'
-        HardWareID    = 'PCI\VEN_8086&DEV_7D67&SUBSYS_88EF1043&REV_06'
+        HardWareID    = 'PCI\VEN_ABCD&DEV_1234&SUBSYS_00000000&REV_01'
     },
     [PSCustomObject]@{
         DeviceName    = 'Some Audio Device'
@@ -109,20 +109,20 @@ $fakeInstalled = @(
 
 $cases = @(
     @{ Name = 'older offered version is superseded'
-       Update = @{ Title = 'Intel Corporation - Display - 32.0.101.6127'
-                   DriverHardwareID = 'pci\ven_8086&dev_7d67&subsys_88ef1043'
+       Update = @{ Title = 'Example Vendor - Display - 20.0.100.4000'
+                   DriverHardwareID = 'pci\ven_abcd&dev_1234&subsys_00000000'
                    DriverVerDate = [DateTime]'2024-10-11' }
        Expected = $true }
 
     @{ Name = 'newer offered version is NOT superseded'
-       Update = @{ Title = 'Intel Corporation - Display - 33.0.101.1000'
-                   DriverHardwareID = 'pci\ven_8086&dev_7d67&subsys_88ef1043'
+       Update = @{ Title = 'Example Vendor - Display - 21.0.100.1000'
+                   DriverHardwareID = 'pci\ven_abcd&dev_1234&subsys_00000000'
                    DriverVerDate = [DateTime]'2026-09-01' }
        Expected = $false }
 
     @{ Name = 'identical version is superseded (nothing to gain)'
-       Update = @{ Title = 'Intel Corporation - Display - 32.0.101.8860'
-                   DriverHardwareID = 'pci\ven_8086&dev_7d67&subsys_88ef1043'
+       Update = @{ Title = 'Example Vendor - Display - 20.0.100.5000'
+                   DriverHardwareID = 'pci\ven_abcd&dev_1234&subsys_00000000'
                    DriverVerDate = [DateTime]'2026-06-24' }
        Expected = $true }
 
