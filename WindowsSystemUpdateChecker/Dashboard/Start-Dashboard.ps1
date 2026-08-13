@@ -323,38 +323,29 @@ function Get-CleanableItemsDetailed {
 }
 
 function Get-SystemStatus {
-    # @() forces array semantics regardless of item count. Without it, PowerShell
-    # unwraps a single-item result: when there is exactly one Windows update,
-    # $windowsUpdates becomes the bare hashtable itself rather than a one-element
-    # array, and .Count then returns that hashtable's *key* count (10 keys) in
-    # place of the update count (1). The same applies to $appUpdates and
-    # $cleanable, and to the Where-Object pipe below - piping a bare hashtable
-    # enumerates its entries instead of testing it as a single object.
-    #
-    # This was live and reproducible: with exactly one Windows update present,
-    # the dashboard reported "10 Windows updates" on the Overview tab. The list
-    # views were unaffected because their API routes already wrap with @(...).
-    $windowsUpdates = @(Get-WindowsUpdatesDetailed)
-    $appUpdates = @(Get-AppUpdatesDetailed)
-    $cleanable = @(Get-CleanableItemsDetailed)
+    <#
+    .SYNOPSIS
+        Returns disk info plus placeholder summary counts.
+    .DESCRIPTION
+        This used to run its own copies of the Windows Update search, the
+        winget check and the cleanable folder scan - the same three scans that
+        /api/updates/windows, /api/updates/apps and /api/cleanable already run
+        - purely to fill in summary.windowsUpdates, .appUpdates,
+        .criticalUpdates and .totalCleanable. Because loadAllData() in app.js
+        fetches all four endpoints and the HTTP server handles them one at a
+        time (Start-HttpServer's loop is single-threaded), that tripled the
+        wall-clock time before the dashboard's Overview cards populated.
 
-    $criticalCount = @($windowsUpdates | Where-Object { $_.severityClass -eq "critical" }).Count
-
-    # Not "Measure-Object -Property size -Sum": Windows PowerShell 5.1 - what
-    # every .bat launcher and the scheduled task actually run under - does not
-    # resolve a hashtable key as a "property" for that parameter. It fails with
-    # "The property 'size' cannot be found in the input for any objects", which
-    # is a non-terminating error under $ErrorActionPreference="Continue", so
-    # execution continued past it with a null Sum and the dashboard silently
-    # showed "0 Bytes reclaimable" on every real run. PowerShell 7 resolves
-    # hashtable keys as properties for this parameter, which is why this only
-    # surfaced when tested under actual PowerShell 5.1 rather than pwsh.
-    # $_.size (member access, not the cmdlet parameter) works on a hashtable in
-    # both versions, so summing that way is used instead.
-    $totalCleanable = 0
-    foreach ($item in $cleanable) { $totalCleanable += $item.size }
-
-    # Disk info
+        It turned out most of that work was thrown away anyway: app.js already
+        overwrote windowsUpdates, appUpdates and criticalUpdates from the list
+        endpoints once they arrived (status.summary.windowsUpdates =
+        windowsUpdates.length, etc.) because it needed those exact numbers to
+        match what the Updates tab displayed. Only totalCleanable was actually
+        read from this function's own scan. app.js now computes that the same
+        way, from the /api/cleanable response, so none of the three detailed
+        scans need to run here at all - this returns as soon as the disk query
+        completes.
+    #>
     $sysDrive = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$env:SystemDrive'" -ErrorAction SilentlyContinue
 
     $status = @{
@@ -362,11 +353,15 @@ function Get-SystemStatus {
         userName = $env:USERNAME
         timestamp = Get-Date -Format "o"
         summary = @{
-            windowsUpdates = $windowsUpdates.Count
-            appUpdates = $appUpdates.Count
-            criticalUpdates = $criticalCount
-            totalCleanable = $totalCleanable
-            totalCleanableFormatted = Format-FileSize $totalCleanable
+            # Placeholders - app.js overwrites all four from the list/cleanable
+            # endpoints it fetches in the same batch. Present so older clients
+            # (or a direct API caller) get a well-shaped response rather than
+            # a missing property.
+            windowsUpdates = 0
+            appUpdates = 0
+            criticalUpdates = 0
+            totalCleanable = 0
+            totalCleanableFormatted = "0 Bytes"
         }
         disk = @{
             drive = $env:SystemDrive

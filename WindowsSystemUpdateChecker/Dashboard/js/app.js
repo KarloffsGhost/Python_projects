@@ -608,11 +608,18 @@ async function loadAllData() {
         appUpdates = appData.items || [];
         cleanableItems = cleanData.items || [];
 
-        // Override summary counts with actual data counts for consistency
+        // /api/status no longer scans for these itself (see the comment on
+        // Get-SystemStatus server-side) - it returns placeholders, and every
+        // summary count is computed here from the list/cleanable responses
+        // that were already fetched in this same batch.
         if (status.summary) {
             status.summary.windowsUpdates = windowsUpdates.length;
             status.summary.appUpdates = appUpdates.length;
             status.summary.criticalUpdates = windowsUpdates.filter(u => u.severityClass === 'critical').length;
+
+            const totalCleanable = cleanableItems.reduce((sum, item) => sum + (item.size || 0), 0);
+            status.summary.totalCleanable = totalCleanable;
+            status.summary.totalCleanableFormatted = formatBytes(totalCleanable);
         }
 
         // Update the dashboard with consistent counts
