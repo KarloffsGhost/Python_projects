@@ -1,16 +1,24 @@
 $ErrorActionPreference = "Continue"
-$ScriptVersion = "1.0.0"
+$ScriptVersion = "1.1.0"
+$ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $LogFile = "$env:USERPROFILE\Desktop\UpdateCheck_$(Get-Date -Format 'yyyy-MM-dd').log"
 
-# Remove previous day's log files (keep only today's)
-Get-ChildItem -Path "$env:USERPROFILE\Desktop" -Filter "UpdateCheck_*.log" -ErrorAction SilentlyContinue | Remove-Item -Force
+Import-Module "$ScriptRoot\Modules\SystemMaintenanceLib.psm1" -Force -ErrorAction Stop
 
+# Remove previous days' log files. Today's is excluded so that a second run on
+# the same day appends to the existing log instead of destroying the first run's.
+Get-ChildItem -Path "$env:USERPROFILE\Desktop" -Filter "UpdateCheck_*.log" -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ne (Split-Path $LogFile -Leaf) } |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+
+# Deliberately overrides the module's Write-Log with a two-argument form bound to
+# this script's log file. Defined after the import so precedence is unambiguous.
 function Write-Log {
     param([string]$Message, [string]$Color = "White")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $logMessage = "[$timestamp] $Message"
     Write-Host $Message -ForegroundColor $Color
-    Add-Content -Path $LogFile -Value $logMessage
+    Add-Content -Path $LogFile -Value $logMessage -Encoding UTF8
 }
 
 Write-Log "========================================" "Cyan"
@@ -30,71 +38,109 @@ if (-not $isAdmin) {
     Write-Log "WARNING: Not running as Administrator. Some checks may be limited." "Yellow"
 }
 
-# CHECK WINDOWS UPDATES
+# CHECK WINDOWS & DRIVER UPDATES
+#
+# A single search. "IsInstalled=0" already returns driver updates alongside
+# everything else, so searching again for Type='Driver' and adding the result to
+# the total counted every driver update twice - one pending Intel driver was
+# being reported as "2 updates available".
 Write-Log "" "White"
-Write-Log "[1] CHECKING WINDOWS UPDATES..." "Cyan"
+Write-Log "[1] CHECKING WINDOWS & DRIVER UPDATES..." "Cyan"
 Write-Log "----------------------------------------" "Gray"
 
-$updateSession = New-Object -ComObject Microsoft.Update.Session
-$updateSearcher = $updateSession.CreateUpdateSearcher()
+$windowsUpdateTitles = @()
+$driverUpdateTitles = @()
 
-Write-Log "Searching for Windows updates..." "Yellow"
-$searchResult = $updateSearcher.Search("IsInstalled=0")
+try {
+    $updateSession = New-Object -ComObject Microsoft.Update.Session
+    $updateSearcher = $updateSession.CreateUpdateSearcher()
 
-if ($searchResult.Updates.Count -eq 0) {
-    Write-Log "Windows is up to date!" "Green"
-} else {
-    Write-Log "Found $($searchResult.Updates.Count) Windows update(s):" "Yellow"
+    Write-Log "Searching for Windows updates..." "Yellow"
+    $searchResult = $updateSearcher.Search("IsInstalled=0")
+
     foreach ($update in $searchResult.Updates) {
+        $isDriver = $false
+        foreach ($category in $update.Categories) {
+            if ($category.Name -match "Driver") {
+                $isDriver = $true
+                break
+            }
+        }
+
         $importance = ""
         if ($update.MsrcSeverity -eq "Critical") {
             $importance = "[CRITICAL] "
             $summary.CriticalUpdates++
         }
-        Write-Log "  $importance$($update.Title)" "White"
-        $summary.WindowsUpdates++
+
+        if ($isDriver) {
+            $driverUpdateTitles += "$importance$($update.Title)"
+            $summary.DriverUpdates++
+        }
+        else {
+            $windowsUpdateTitles += "$importance$($update.Title)"
+            $summary.WindowsUpdates++
+        }
     }
 }
+catch {
+    Write-Log "ERROR: Windows Update search failed: $($_.Exception.Message)" "Red"
+    Write-Log "  (Windows Update service may be stopped, or a scan is already running)" "Gray"
+}
 
-# CHECK DRIVER UPDATES
-Write-Log "" "White"
-Write-Log "[2] CHECKING DRIVER UPDATES..." "Cyan"
-Write-Log "----------------------------------------" "Gray"
-
-$driverSearchResult = $updateSearcher.Search("IsInstalled=0 and Type='Driver'")
-
-if ($driverSearchResult.Updates.Count -eq 0) {
-    Write-Log "All drivers are up to date!" "Green"
+if ($windowsUpdateTitles.Count -eq 0) {
+    Write-Log "Windows is up to date!" "Green"
 } else {
-    Write-Log "Found $($driverSearchResult.Updates.Count) driver update(s):" "Yellow"
-    foreach ($update in $driverSearchResult.Updates) {
-        Write-Log "  $($update.Title)" "White"
-        $summary.DriverUpdates++
+    Write-Log "Found $($windowsUpdateTitles.Count) Windows update(s):" "Yellow"
+    foreach ($title in $windowsUpdateTitles) {
+        Write-Log "  $title" "White"
     }
 }
 
-# Check for old drivers
 Write-Log "" "White"
-Write-Log "Checking driver ages..." "Yellow"
+if ($driverUpdateTitles.Count -eq 0) {
+    Write-Log "No driver updates offered by Windows Update" "Green"
+} else {
+    Write-Log "Found $($driverUpdateTitles.Count) driver update(s):" "Yellow"
+    foreach ($title in $driverUpdateTitles) {
+        Write-Log "  $title" "White"
+    }
+}
+
+# CHECK DRIVER AGES
+Write-Log "" "White"
+Write-Log "[2] CHECKING DRIVER AGES..." "Cyan"
+Write-Log "----------------------------------------" "Gray"
 $oldDriverCount = 0
 $cutoffDate = (Get-Date).AddMonths(-6)
 
-$drivers = Get-WmiObject Win32_PnPSignedDriver | Where-Object {
-    $_.DriverDate -and $_.DeviceName -match "Graphics|Network|Audio|Bluetooth|USB|Chipset"
-} | Select-Object DeviceName, @{Name="DriverDate";Expression={[Management.ManagementDateTimeConverter]::ToDateTime($_.DriverDate)}}
+# Microsoft's inbox drivers are excluded. They carry a placeholder date of
+# 2006-06-21 that never changes, so they always look "old" - this listed 40+
+# USB/Bluetooth entries the report itself then told you to ignore.
+#
+# Get-CimInstance returns DriverDate already typed as [DateTime], and unlike
+# Get-WmiObject it exists in PowerShell 7 without the WinPS compatibility shim.
+$drivers = Get-CimInstance Win32_PnPSignedDriver -ErrorAction SilentlyContinue | Where-Object {
+    $_.DriverDate -and
+    $_.DeviceName -match "Graphics|Network|Audio|Bluetooth|USB|Chipset" -and
+    $_.DriverProviderName -notmatch "^Microsoft"
+} | Select-Object DeviceName, DriverDate, DriverProviderName, DriverVersion
 
 foreach ($driver in $drivers) {
     if ($driver.DriverDate -lt $cutoffDate) {
         if ($oldDriverCount -eq 0) {
             Write-Log "Drivers older than 6 months:" "Yellow"
         }
-        Write-Log "  $($driver.DeviceName) - $($driver.DriverDate.ToString('yyyy-MM-dd'))" "Yellow"
+        Write-Log ("  {0} - {1} (v{2}, {3})" -f $driver.DeviceName,
+                                                $driver.DriverDate.ToString('yyyy-MM-dd'),
+                                                $driver.DriverVersion,
+                                                $driver.DriverProviderName) "Yellow"
         $oldDriverCount++
     }
 }
 
 if ($oldDriverCount -eq 0) {
-    Write-Log "All critical drivers are less than 6 months old" "Green"
+    Write-Log "All third-party drivers are less than 6 months old" "Green"
 }
 
 # CHECK APPLICATION UPDATES
@@ -102,29 +148,30 @@ Write-Log "" "White"
 Write-Log "[3] CHECKING APPLICATION UPDATES (via winget)..." "Cyan"
 Write-Log "----------------------------------------" "Gray"
 
-$wingetPath = Get-Command winget -ErrorAction SilentlyContinue
+Write-Log "Checking for application updates..." "Yellow"
+$wingetResult = Get-WingetUpgrades -IncludeUnknown
 
-if ($wingetPath) {
-    Write-Log "Checking for application updates..." "Yellow"
-    $wingetOutput = winget upgrade 2>&1 | Out-String
-    $upgradeLines = $wingetOutput -split "`n" | Where-Object { $_ -match "^\S+\s+\S+" } | Select-Object -Skip 2
+if ($wingetResult.Error) {
+    Write-Log $wingetResult.Error "Yellow"
+}
+elseif ($wingetResult.Count -eq 0) {
+    Write-Log "All applications are up to date!" "Green"
+}
+else {
+    # Count every upgrade, but only print the first 10. The counter used to live
+    # inside the display loop, which capped the reported total at 10 forever.
+    $summary.AppUpdates = $wingetResult.Count
 
-    if ($upgradeLines.Count -gt 0) {
-        Write-Log "Found application updates available:" "Yellow"
-        foreach ($line in $upgradeLines | Select-Object -First 10) {
-            if ($line.Trim()) {
-                Write-Log "  $line" "White"
-                $summary.AppUpdates++
-            }
-        }
-        if ($upgradeLines.Count -gt 10) {
-            Write-Log "  ... and $($upgradeLines.Count - 10) more" "Gray"
-        }
-    } else {
-        Write-Log "All applications are up to date!" "Green"
+    Write-Log "Found $($wingetResult.Count) application update(s):" "Yellow"
+
+    $displayLimit = 10
+    foreach ($package in $wingetResult.Packages | Select-Object -First $displayLimit) {
+        Write-Log ("  {0}  ({1} -> {2})" -f $package.Name, $package.CurrentVersion, $package.NewVersion) "White"
     }
-} else {
-    Write-Log "winget not found. Install Windows Package Manager for app update checks." "Yellow"
+
+    if ($wingetResult.Packages.Count -gt $displayLimit) {
+        Write-Log "  ... and $($wingetResult.Packages.Count - $displayLimit) more" "Gray"
+    }
 }
 
 # SYSTEM HEALTH CHECK
@@ -132,7 +179,7 @@ Write-Log "" "White"
 Write-Log "[4] SYSTEM HEALTH CHECK..." "Cyan"
 Write-Log "----------------------------------------" "Gray"
 
-$problemDevices = Get-WmiObject Win32_PnPEntity | Where-Object {$_.ConfigManagerErrorCode -ne 0}
+$problemDevices = @(Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object {$_.ConfigManagerErrorCode -ne 0})
 
 if ($problemDevices) {
     Write-Log "Found $($problemDevices.Count) device(s) with errors:" "Yellow"
@@ -143,13 +190,40 @@ if ($problemDevices) {
     Write-Log "No device errors detected" "Green"
 }
 
-$defenderStatus = Get-MpComputerStatus -ErrorAction SilentlyContinue
-if ($defenderStatus) {
-    $defenderAge = (Get-Date) - $defenderStatus.AntivirusSignatureLastUpdated
-    if ($defenderAge.TotalDays -lt 2) {
-        Write-Log "Windows Defender signatures up to date" "Green"
-    } else {
-        Write-Log "Windows Defender signatures outdated" "Yellow"
+# Antivirus status.
+#
+# This used to read Get-MpComputerStatus().AntivirusSignatureLastUpdated and
+# subtract it from the current date. When a third-party AV is active, Defender
+# leaves that property null, the subtraction threw, and $null.TotalDays -lt 2
+# evaluates to $true - so the report printed "signatures up to date" every single
+# day regardless of the actual state. Security Center is asked instead, because
+# it knows which product is actually protecting the machine.
+Write-Log "" "White"
+$avProducts = @(Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntiVirusProduct -ErrorAction SilentlyContinue)
+
+if ($avProducts.Count -eq 0) {
+    Write-Log "WARNING: No antivirus product is registered with Windows Security" "Red"
+}
+else {
+    foreach ($av in $avProducts) {
+        # productState packs two flags: byte 1 is the scanner state (0x10/0x11
+        # mean enabled) and byte 0 is the signature state (0x00 means current).
+        $scannerEnabled = ((($av.productState -shr 8) -band 0xFF) -in @(0x10, 0x11))
+        $signaturesCurrent = (($av.productState -band 0xFF) -eq 0x00)
+
+        if ($scannerEnabled -and $signaturesCurrent) {
+            Write-Log "$($av.displayName): active, signatures up to date" "Green"
+        }
+        elseif ($scannerEnabled) {
+            Write-Log "$($av.displayName): active, SIGNATURES OUT OF DATE" "Yellow"
+        }
+        else {
+            Write-Log "$($av.displayName): not active (disabled or superseded)" "Gray"
+        }
+    }
+
+    if (-not ($avProducts | Where-Object { ((($_.productState -shr 8) -band 0xFF) -in @(0x10, 0x11)) })) {
+        Write-Log "WARNING: No antivirus product is currently active on this machine" "Red"
     }
 }
 
@@ -158,10 +232,13 @@ Write-Log "" "White"
 Write-Log "========================================" "Cyan"
 Write-Log "UPDATE SUMMARY" "Cyan"
 Write-Log "========================================" "Cyan"
+$totalUpdates = $summary.WindowsUpdates + $summary.DriverUpdates + $summary.AppUpdates
 Write-Log "Windows Updates:     $($summary.WindowsUpdates)" "White"
 Write-Log "Driver Updates:      $($summary.DriverUpdates)" "White"
 Write-Log "Application Updates: $($summary.AppUpdates)" "White"
-Write-Log "Critical Updates:    $($summary.CriticalUpdates)" "White"
+Write-Log "----------------------------------------" "Gray"
+Write-Log "TOTAL:               $totalUpdates" "White"
+Write-Log "  of which critical: $($summary.CriticalUpdates)" "Gray"
 Write-Log "========================================" "Cyan"
 
 Write-Log "" "White"
@@ -181,8 +258,9 @@ if ($summary.WindowsUpdates -gt 0 -or $summary.DriverUpdates -gt 0) {
         Write-Log "  -> Review the list above for specific recommendations" "White"
     }
     Write-Log "" "White"
-    Write-Log "  Note: Old drivers (2006 dates) for USB/Bluetooth are usually" "Gray"
-    Write-Log "  Windows built-in drivers and can be ignored unless you have issues" "Gray"
+    Write-Log "  Note: Windows Update sometimes offers a driver older than the one" "Gray"
+    Write-Log "  you already have. InstallUpdates-Windows.ps1 checks versions and" "Gray"
+    Write-Log "  skips those automatically." "Gray"
 }
 
 # Applications

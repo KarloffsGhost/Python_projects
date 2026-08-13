@@ -363,6 +363,182 @@ function Show-ToastNotification {
 }
 
 # ============================================
+# WINGET FUNCTIONS
+# ============================================
+
+function Get-WingetUpgrades {
+    <#
+    .SYNOPSIS
+        Returns the application upgrades winget has available.
+    .DESCRIPTION
+        winget has no machine-readable output for `winget upgrade`, so its table
+        has to be parsed. Splitting each row on runs of whitespace (the approach
+        this toolkit used previously) mis-parses any package whose name contains
+        two or more consecutive spaces, and counts the header, separator and
+        summary lines as if they were packages. This parses positionally instead,
+        using the column offsets taken from winget's own header row.
+
+        Count comes from winget's own "N upgrades available" line when present,
+        so a single unparseable row cannot silently shrink the reported total.
+    .PARAMETER IncludeUnknown
+        Include packages whose installed version winget cannot determine. These
+        are genuinely out of date but are excluded from `winget upgrade` by
+        default, so omitting this under-reports.
+    .OUTPUTS
+        Hashtable: Available (bool), Count (int), Packages (array), Error (string)
+    #>
+    param(
+        [switch]$IncludeUnknown
+    )
+
+    $result = @{
+        Available = $false
+        Count     = 0
+        Packages  = @()
+        Error     = $null
+    }
+
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        $result.Error = "winget not found. Install Windows Package Manager (App Installer) to check application updates."
+        return $result
+    }
+
+    # winget emits UTF-8. Without this the console decodes it as the OEM code
+    # page and names come back mangled (e.g. "HWiNFO-? 64").
+    $previousEncoding = [Console]::OutputEncoding
+    $output = ""
+
+    try {
+        [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+        $arguments = @('upgrade', '--accept-source-agreements')
+        if ($IncludeUnknown) { $arguments += '--include-unknown' }
+
+        $output = & winget @arguments 2>&1 | Out-String
+    }
+    catch {
+        $result.Error = "winget upgrade failed: $($_.Exception.Message)"
+        return $result
+    }
+    finally {
+        [Console]::OutputEncoding = $previousEncoding
+    }
+
+    $lines = $output -split "`r?`n"
+
+    # The table is introduced by a run of dashes; the header sits directly above
+    # it. Locating the header this way avoids depending on English column names.
+    $separatorIndex = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^-{5,}\s*$') {
+            $separatorIndex = $i
+            break
+        }
+    }
+
+    if ($separatorIndex -lt 1) {
+        # No table at all - either nothing to upgrade, or output we don't understand.
+        if ($output -match '(?m)^\s*(\d+)\s+upgrade') { $result.Count = [int]$Matches[1] }
+        $result.Available = $result.Count -gt 0
+        return $result
+    }
+
+    $header = $lines[$separatorIndex - 1]
+
+    # A column begins at each non-space character that follows a space.
+    $columnStarts = @()
+    for ($c = 0; $c -lt $header.Length; $c++) {
+        if ($header[$c] -ne ' ' -and ($c -eq 0 -or $header[$c - 1] -eq ' ')) {
+            $columnStarts += $c
+        }
+    }
+
+    if ($columnStarts.Count -lt 4) {
+        $result.Error = "Could not parse the winget upgrade table header."
+        return $result
+    }
+
+    for ($i = $separatorIndex + 1; $i -lt $lines.Count; $i++) {
+        $line = $lines[$i]
+
+        # Blank line, the trailing summary, or the "requires explicit targeting"
+        # notice all mark the end of the table.
+        if ([string]::IsNullOrWhiteSpace($line)) { break }
+        if ($line -match '^\s*\d+\s+upgrade') { break }
+        if ($line.Length -le $columnStarts[1]) { break }
+
+        $fields = @()
+        for ($col = 0; $col -lt $columnStarts.Count; $col++) {
+            $start = $columnStarts[$col]
+            if ($start -ge $line.Length) {
+                $fields += ""
+                continue
+            }
+
+            if ($col -eq $columnStarts.Count - 1) {
+                $fields += $line.Substring($start).Trim()
+            }
+            else {
+                $end = [Math]::Min($columnStarts[$col + 1], $line.Length)
+                $fields += $line.Substring($start, $end - $start).Trim()
+            }
+        }
+
+        if (-not $fields[0] -or -not $fields[1]) { continue }
+
+        $result.Packages += [PSCustomObject]@{
+            Name           = $fields[0]
+            Id             = $fields[1]
+            CurrentVersion = $fields[2]
+            NewVersion     = $fields[3]
+            Source         = if ($fields.Count -ge 5) { $fields[4] } else { "winget" }
+        }
+    }
+
+    if ($output -match '(?m)^\s*(\d+)\s+upgrade') {
+        $result.Count = [int]$Matches[1]
+    }
+    else {
+        $result.Count = $result.Packages.Count
+    }
+
+    $result.Available = $result.Count -gt 0
+    return $result
+}
+
+function Get-WingetCategory {
+    <#
+    .SYNOPSIS
+        Classifies a package name so browsers and security tools can be
+        prioritised over everything else.
+    .OUTPUTS
+        Hashtable: Category (string), Priority (high|medium|low)
+    #>
+    param(
+        [string]$Name
+    )
+
+    $securityApps = @('Chrome', 'Firefox', 'Edge', 'Brave', 'VPN', 'Proton', 'Security',
+                      'Malwarebytes', 'Bitwarden', '1Password', 'KeePass')
+    $devTools = @('Git', 'Node', 'Python', 'Visual Studio', 'VS Code', 'Docker', 'Go',
+                  'Rust', 'Java', 'dotnet', 'PowerShell', 'Cursor', 'WSL', 'Windows Subsystem')
+
+    foreach ($app in $securityApps) {
+        if ($Name -match [regex]::Escape($app)) {
+            return @{ Category = "Security/Browser"; Priority = "high" }
+        }
+    }
+
+    foreach ($app in $devTools) {
+        if ($Name -match [regex]::Escape($app)) {
+            return @{ Category = "Development"; Priority = "medium" }
+        }
+    }
+
+    return @{ Category = "Other"; Priority = "low" }
+}
+
+# ============================================
 # CONFIG FUNCTIONS
 # ============================================
 
@@ -420,14 +596,21 @@ function Save-ScanData {
         [string]$FileName = "last-scan.json"
     )
 
-    $dataPath = Join-Path $PSScriptRoot "..\Data\$FileName"
+    $dataDir = Join-Path $PSScriptRoot "..\Data"
+    $dataPath = Join-Path $dataDir $FileName
 
     try {
+        # Data/ is gitignored, so it will not exist in a fresh clone.
+        if (-not (Test-Path $dataDir)) {
+            New-Item -Path $dataDir -ItemType Directory -Force | Out-Null
+        }
+
         $ScanData | Add-Member -NotePropertyName "Timestamp" -NotePropertyValue (Get-Date -Format "o") -Force
         $ScanData | ConvertTo-Json -Depth 10 | Set-Content $dataPath -Force
         return $true
     }
     catch {
+        Write-Warning "Save-ScanData failed for '$FileName': $($_.Exception.Message)"
         return $false
     }
 }
@@ -464,9 +647,14 @@ function Add-ScanHistory {
         [object]$ScanSummary
     )
 
-    $historyPath = Join-Path $PSScriptRoot "..\Data\scan-history.json"
+    $dataDir = Join-Path $PSScriptRoot "..\Data"
+    $historyPath = Join-Path $dataDir "scan-history.json"
 
     try {
+        if (-not (Test-Path $dataDir)) {
+            New-Item -Path $dataDir -ItemType Directory -Force | Out-Null
+        }
+
         $history = @()
         if (Test-Path $historyPath) {
             $existing = Get-Content $historyPath -Raw | ConvertFrom-Json
@@ -495,6 +683,7 @@ function Add-ScanHistory {
         return $true
     }
     catch {
+        Write-Warning "Add-ScanHistory failed: $($_.Exception.Message)"
         return $false
     }
 }
@@ -690,6 +879,8 @@ Export-ModuleMember -Function @(
     'Get-FolderSize',
     'Get-FileCount',
     'Remove-FolderContents',
+    'Get-WingetUpgrades',
+    'Get-WingetCategory',
     'Show-ToastNotification',
     'Get-ToolkitConfig',
     'Save-ToolkitConfig',
