@@ -323,12 +323,36 @@ function Get-CleanableItemsDetailed {
 }
 
 function Get-SystemStatus {
-    $windowsUpdates = Get-WindowsUpdatesDetailed
-    $appUpdates = Get-AppUpdatesDetailed
-    $cleanable = Get-CleanableItemsDetailed
+    # @() forces array semantics regardless of item count. Without it, PowerShell
+    # unwraps a single-item result: when there is exactly one Windows update,
+    # $windowsUpdates becomes the bare hashtable itself rather than a one-element
+    # array, and .Count then returns that hashtable's *key* count (10 keys) in
+    # place of the update count (1). The same applies to $appUpdates and
+    # $cleanable, and to the Where-Object pipe below - piping a bare hashtable
+    # enumerates its entries instead of testing it as a single object.
+    #
+    # This was live and reproducible: with exactly one Windows update present,
+    # the dashboard reported "10 Windows updates" on the Overview tab. The list
+    # views were unaffected because their API routes already wrap with @(...).
+    $windowsUpdates = @(Get-WindowsUpdatesDetailed)
+    $appUpdates = @(Get-AppUpdatesDetailed)
+    $cleanable = @(Get-CleanableItemsDetailed)
 
-    $criticalCount = ($windowsUpdates | Where-Object { $_.severityClass -eq "critical" }).Count
-    $totalCleanable = ($cleanable | Measure-Object -Property size -Sum).Sum
+    $criticalCount = @($windowsUpdates | Where-Object { $_.severityClass -eq "critical" }).Count
+
+    # Not "Measure-Object -Property size -Sum": Windows PowerShell 5.1 - what
+    # every .bat launcher and the scheduled task actually run under - does not
+    # resolve a hashtable key as a "property" for that parameter. It fails with
+    # "The property 'size' cannot be found in the input for any objects", which
+    # is a non-terminating error under $ErrorActionPreference="Continue", so
+    # execution continued past it with a null Sum and the dashboard silently
+    # showed "0 Bytes reclaimable" on every real run. PowerShell 7 resolves
+    # hashtable keys as properties for this parameter, which is why this only
+    # surfaced when tested under actual PowerShell 5.1 rather than pwsh.
+    # $_.size (member access, not the cmdlet parameter) works on a hashtable in
+    # both versions, so summing that way is used instead.
+    $totalCleanable = 0
+    foreach ($item in $cleanable) { $totalCleanable += $item.size }
 
     # Disk info
     $sysDrive = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='$env:SystemDrive'" -ErrorAction SilentlyContinue

@@ -3,7 +3,7 @@
 ## 📍 Location
 **C:\Users\YourName\SystemUpdateChecker**
 
-All update checker files should be in your user folder.
+All update checker files are now in your user folder (NOT in ComfyUI).
 
 ---
 

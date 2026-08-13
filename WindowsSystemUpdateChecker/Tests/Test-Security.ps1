@@ -159,6 +159,42 @@ foreach ($case in $cases) {
 }
 
 # ============================================
+# Dashboard summary totals under Windows PowerShell 5.1
+# ============================================
+
+Write-Host ""
+Write-Host "Get-SystemStatus - PowerShell 5.1 compatibility" -ForegroundColor Cyan
+
+# Windows PowerShell 5.1 - what every .bat launcher and the scheduled task
+# actually run under - does not resolve a hashtable key as a "property" for
+# Measure-Object's -Property parameter. It fails with "The property cannot be
+# found in the input for any objects", a non-terminating error under
+# $ErrorActionPreference="Continue", so the script kept running with a null
+# Sum. The dashboard's Get-CleanableItemsDetailed builds plain hashtables (not
+# PSCustomObject), so Get-SystemStatus summed their "size" with a manual
+# foreach loop instead. This was caught by running the dashboard live under
+# actual powershell.exe rather than pwsh - it did not reproduce under
+# PowerShell 7, which resolves hashtable keys for that parameter without issue.
+#
+# This test does not require PowerShell 5.1 itself: it asserts the manual-sum
+# approach on a hashtable array, which is what makes the fix version-agnostic
+# rather than merely re-testing on whichever engine happens to run this file.
+$hashtableItems = @(
+    @{ name = "a"; size = 100 },
+    @{ name = "b"; size = 250 },
+    @{ name = "c"; size = 0 }
+)
+
+$manualSum = 0
+foreach ($item in $hashtableItems) { $manualSum += $item.size }
+Assert-That "manual foreach sum over a hashtable array is correct" ($manualSum -eq 350) "got $manualSum"
+
+$singleItem = @(@{ name = "only"; size = 42 })
+$manualSumSingle = 0
+foreach ($item in $singleItem) { $manualSumSingle += $item.size }
+Assert-That "manual foreach sum handles a single-item hashtable array" ($manualSumSingle -eq 42) "got $manualSumSingle"
+
+# ============================================
 # Get-WingetUpgrades parsing
 # ============================================
 
