@@ -60,7 +60,7 @@ function Test-DriverUpdateSuperseded {
     if (-not $installed) { return $result }
 
     # The offered version is the last dotted-numeric token of the update title,
-    # e.g. "Intel Corporation - Display - 32.0.101.6127".
+    # e.g. "Vendor Name - Display - 20.0.100.4000".
     $offeredVersion = $null
     if ($Update.Title -match '(\d+(?:\.\d+){2,})\s*$') {
         [version]::TryParse($Matches[1], [ref]$offeredVersion) | Out-Null

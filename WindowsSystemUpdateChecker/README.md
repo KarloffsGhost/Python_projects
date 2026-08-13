@@ -303,7 +303,42 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 - Install from Microsoft Store: [App Installer](https://apps.microsoft.com/store/detail/app-installer/9NBLGGH4NNS1)
 
 **Antivirus blocks scripts:**
-- Add folder to exclusions: `C:\Users\YourName\SystemUpdateChecker`
+- `Dashboard\Start-Dashboard.ps1` is the one that gets flagged, because it opens
+  a local HTTP listener and launches elevated processes. Add an exception for
+  that single file rather than the whole folder - a folder exception stops your
+  AV scanning anything that lands there later.
+
+## Reading the results
+
+**"Driver update shows an older version than I have installed"**
+- Handled automatically since v2.1.0. `InstallUpdates-Windows.ps1` compares the
+  offered driver against the installed one by hardware ID, version and date, and
+  skips it with the reason printed.
+- It also offers to hide such updates, since Windows re-offers them on every
+  scan otherwise. Hiding is reversible from Windows Update.
+
+**"Drivers dated 2006-06-21"**
+- Normal, and no longer reported since v2.1.0. These are Windows inbox drivers
+  (USB, Bluetooth stack) which carry a fixed placeholder date and always looked
+  stale. Driver age analysis now covers third-party drivers only.
+
+**"Error Code 22 - Device disabled"**
+- Not actually an error. The device is manually disabled. No action needed.
+
+**"Error Code 52 - Unsigned driver"**
+- Usually antivirus or security software drivers. If the software works,
+  ignore it.
+
+**"30+ application updates available"**
+- Priority 1: browsers (Chrome, Firefox, Edge) - security relevant
+- Priority 2: development tools you actually use
+- Priority 3: everything else, when convenient
+- `InstallUpdates-Interactive.bat` groups them this way; `[S]` takes the first
+  category only.
+
+**"The update count changed between runs"**
+- Expected. Application counts come from winget and move as packages publish
+  new versions or auto-update themselves.
 
 ## Version History
 
