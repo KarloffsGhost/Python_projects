@@ -12,6 +12,40 @@ let cleanableItems = [];
 // UTILITIES
 // ============================================
 
+// Injected into index.html by the server when the page is served.
+const DASHBOARD_TOKEN = document.querySelector('meta[name="dashboard-token"]').content;
+
+// All API traffic goes through here so the session token cannot be forgotten on
+// a new call site. The server rejects any /api request without it.
+function apiFetch(url, options = {}) {
+    const headers = Object.assign({}, options.headers, {
+        'X-Dashboard-Token': DASHBOARD_TOKEN
+    });
+    return fetch(url, Object.assign({}, options, { headers }));
+}
+
+function apiPost(url, payload) {
+    return apiFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+}
+
+// Package names and update titles come from winget manifests and Windows
+// Update, i.e. from outside this machine. They were being interpolated straight
+// into innerHTML, so a crafted name could inject markup into a page that can
+// launch elevated processes.
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function formatBytes(bytes) {
     if (!bytes || bytes === 0) return '0 B';
     const k = 1024;
@@ -73,7 +107,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 async function fetchStatus() {
     try {
-        const response = await fetch('/api/status');
+        const response = await apiFetch('/api/status');
         return await response.json();
     } catch (error) {
         console.error('Error fetching status:', error);
@@ -83,7 +117,7 @@ async function fetchStatus() {
 
 async function loadWindowsUpdates() {
     try {
-        const response = await fetch('/api/updates/windows');
+        const response = await apiFetch('/api/updates/windows');
         const data = await response.json();
         windowsUpdates = data.items || [];
         renderWindowsUpdates();
@@ -96,7 +130,7 @@ async function loadWindowsUpdates() {
 
 async function loadAppUpdates() {
     try {
-        const response = await fetch('/api/updates/apps');
+        const response = await apiFetch('/api/updates/apps');
         const data = await response.json();
         appUpdates = data.items || [];
         renderAppUpdates();
@@ -109,7 +143,7 @@ async function loadAppUpdates() {
 
 async function loadCleanableItems() {
     try {
-        const response = await fetch('/api/cleanable');
+        const response = await apiFetch('/api/cleanable');
         const data = await response.json();
         cleanableItems = data.items || [];
         renderCleanableItems();
@@ -148,17 +182,17 @@ function renderWindowsUpdates() {
         html += `
             <div class="item-row ${severityClass}">
                 <label class="item-checkbox">
-                    <input type="checkbox" data-type="windows" data-id="${update.id}" data-index="${index}"
+                    <input type="checkbox" data-type="windows" data-id="${escapeHtml(update.id)}" data-index="${index}"
                            onchange="updateWindowsSelection()" ${severityClass === 'critical' ? 'checked' : ''}>
                     <span class="checkmark"></span>
                 </label>
                 <div class="item-content">
                     <div class="item-title">
                         ${typeBadge} ${severityBadge}
-                        ${update.title}
+                        ${escapeHtml(update.title)}
                     </div>
                     <div class="item-meta">
-                        ${update.sizeFormatted || ''} ${update.kbArticles && update.kbArticles.length ? '| KB' + update.kbArticles.join(', KB') : ''}
+                        ${escapeHtml(update.sizeFormatted || '')} ${update.kbArticles && update.kbArticles.length ? '| KB' + escapeHtml(update.kbArticles.join(', KB')) : ''}
                     </div>
                 </div>
             </div>
@@ -199,7 +233,7 @@ function renderAppUpdates() {
         html += `<div class="category-group">
             <div class="category-header ${priorityClass}">
                 <span class="category-icon">${categoryIcon}</span>
-                ${category}
+                ${escapeHtml(category)}
                 <span class="category-count">${grouped[category].length}</span>
                 ${category === 'Security/Browser' ? '<span class="recommended-badge">RECOMMENDED</span>' : ''}
             </div>`;
@@ -208,15 +242,15 @@ function renderAppUpdates() {
             html += `
                 <div class="item-row ${priorityClass}">
                     <label class="item-checkbox">
-                        <input type="checkbox" data-type="app" data-id="${app.id}" data-index="${app.index}"
-                               data-category="${category}" onchange="updateAppSelection()"
+                        <input type="checkbox" data-type="app" data-id="${escapeHtml(app.id)}" data-index="${app.index}"
+                               data-category="${escapeHtml(category)}" onchange="updateAppSelection()"
                                ${category === 'Security/Browser' ? 'checked' : ''}>
                         <span class="checkmark"></span>
                     </label>
                     <div class="item-content">
-                        <div class="item-title">${app.name}</div>
+                        <div class="item-title">${escapeHtml(app.name)}</div>
                         <div class="item-meta">
-                            ${app.currentVersion} &rarr; <strong>${app.availableVersion}</strong>
+                            ${escapeHtml(app.currentVersion)} &rarr; <strong>${escapeHtml(app.availableVersion)}</strong>
                         </div>
                     </div>
                 </div>
@@ -261,7 +295,7 @@ function renderCleanableItems() {
         html += `<div class="category-group">
             <div class="category-header">
                 <span class="category-icon">${categoryIcon}</span>
-                ${category}
+                ${escapeHtml(category)}
                 <span class="category-size">${formatBytes(categoryTotal)}</span>
             </div>`;
 
@@ -274,19 +308,19 @@ function renderCleanableItems() {
             html += `
                 <div class="item-row">
                     <label class="item-checkbox">
-                        <input type="checkbox" data-type="clean" data-id="${item.id}" data-index="${item.index}"
-                               data-size="${item.size || 0}" data-risk="${item.risk}"
+                        <input type="checkbox" data-type="clean" data-id="${escapeHtml(item.id)}" data-index="${item.index}"
+                               data-size="${item.size || 0}" data-risk="${escapeHtml(item.risk)}"
                                onchange="updateCleanSelection()" ${riskClass === 'safe' ? 'checked' : ''}>
                         <span class="checkmark"></span>
                     </label>
                     <div class="item-content">
                         <div class="item-title">
-                            ${item.name}
+                            ${escapeHtml(item.name)}
                             ${riskBadge}
                         </div>
                         <div class="item-meta">
-                            <strong>${item.sizeFormatted || formatBytes(item.size)}</strong>
-                            <span class="item-desc">${item.description || ''}</span>
+                            <strong>${escapeHtml(item.sizeFormatted || formatBytes(item.size))}</strong>
+                            <span class="item-desc">${escapeHtml(item.description || '')}</span>
                         </div>
                     </div>
                 </div>
@@ -371,11 +405,7 @@ async function installSelectedWindows() {
     showToast('Launching Windows Update installer...', 'info');
 
     try {
-        const response = await fetch('/api/action/update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'windows' })
-        });
+        const response = await apiPost('/api/action/update', { type: 'windows' });
         const result = await response.json();
 
         if (result.success) {
@@ -400,11 +430,7 @@ async function installSelectedApps() {
     showToast(`Installing ${ids.length} app(s)...`, 'info');
 
     try {
-        const response = await fetch('/api/action/update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'apps', ids: ids })
-        });
+        const response = await apiPost('/api/action/update', { type: 'apps', ids: ids });
         const result = await response.json();
 
         if (result.success) {
@@ -429,11 +455,7 @@ async function cleanSelected() {
     showToast('Launching System Cleaner...', 'info');
 
     try {
-        const response = await fetch('/api/action/clean', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: ids })
-        });
+        const response = await apiPost('/api/action/clean', { ids: ids });
         const result = await response.json();
 
         if (result.success) {
@@ -462,23 +484,11 @@ async function launchTool(tool) {
 
     // For tools that have specific scripts, we'll use the action endpoint
     if (tool === 'updater') {
-        const response = await fetch('/api/action/update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'apps' })
-        });
+        const response = await apiPost('/api/action/update', { type: 'apps' });
     } else if (tool === 'windows') {
-        const response = await fetch('/api/action/update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'windows' })
-        });
+        const response = await apiPost('/api/action/update', { type: 'windows' });
     } else if (tool === 'cleaner' || tool === 'ai-cleaner') {
-        const response = await fetch('/api/action/clean', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: [] })
-        });
+        const response = await apiPost('/api/action/clean', { ids: [] });
     } else {
         showToast('Tool will open in PowerShell window', 'info');
     }
@@ -582,10 +592,10 @@ async function loadAllData() {
     // Fetch all detailed data first
     try {
         const [winResponse, appResponse, cleanResponse, statusResponse] = await Promise.all([
-            fetch('/api/updates/windows'),
-            fetch('/api/updates/apps'),
-            fetch('/api/cleanable'),
-            fetch('/api/status')
+            apiFetch('/api/updates/windows'),
+            apiFetch('/api/updates/apps'),
+            apiFetch('/api/cleanable'),
+            apiFetch('/api/status')
         ]);
 
         const winData = await winResponse.json();

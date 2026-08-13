@@ -20,3 +20,6 @@ DriverBackups/
 
 # Backups of disabled startup entries (contains local paths and app names)
 Config/startup-backup/
+
+# Local editor/agent scratch config
+.claude/

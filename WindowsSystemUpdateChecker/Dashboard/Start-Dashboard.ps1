@@ -1,14 +1,40 @@
+param(
+    [switch]$NoBrowser
+)
+
 $ErrorActionPreference = "Continue"
-$ScriptVersion = "2.0.0"
+$ScriptVersion = "2.1.0"
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ParentRoot = Split-Path -Parent $ScriptRoot
 
-# Configuration
+# Configuration (Config\dashboard-settings.json overrides these)
 $Port = 8080
 $MaxPort = 8090
 
-# Import shared library
-Import-Module "$ParentRoot\Modules\SystemMaintenanceLib.psm1" -Force -ErrorAction SilentlyContinue
+$dashboardConfig = $null
+$configPath = Join-Path $ParentRoot "Config\dashboard-settings.json"
+if (Test-Path $configPath) {
+    try {
+        $dashboardConfig = Get-Content $configPath -Raw | ConvertFrom-Json
+        if ($dashboardConfig.Server.Port) { $Port = [int]$dashboardConfig.Server.Port }
+        if ($dashboardConfig.Server.MaxPort) { $MaxPort = [int]$dashboardConfig.Server.MaxPort }
+    }
+    catch {
+        Write-Host "  Warning: Config\dashboard-settings.json could not be read ($($_.Exception.Message)); using defaults" -ForegroundColor Yellow
+    }
+}
+
+# Per-session token. The dashboard can launch elevated processes, so every /api
+# request must present it. It is injected into index.html when the page is
+# served, which means only a document actually loaded from this server can
+# obtain it - a page on another origin cannot read our HTML, so it cannot forge
+# an accepted request even though the browser would happily let it POST here.
+$SessionToken = [System.Guid]::NewGuid().ToString('N') + [System.Guid]::NewGuid().ToString('N')
+
+# Import shared library. Stop rather than continue - the dashboard depends on
+# Format-FileSize, Get-FolderSize and Get-WingetUpgrades, and silently carrying
+# on without them produced a dashboard that showed zeros for everything.
+Import-Module "$ParentRoot\Modules\SystemMaintenanceLib.psm1" -Force -ErrorAction Stop
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -58,78 +84,40 @@ function Get-WindowsUpdatesDetailed {
         }
     }
     catch {
-        # Silent fail
+        # Surfaced in the server console rather than swallowed - a failed
+        # Windows Update search used to render as "0 updates available".
+        Write-Host "  Windows Update search failed: $($_.Exception.Message)" -ForegroundColor Red
     }
 
     return $updates
 }
 
 function Get-AppUpdatesDetailed {
+    # Parsing lives in SystemMaintenanceLib so the dashboard, the daily checker
+    # and the interactive updater all report the same set of packages. The
+    # copy that used to live here split rows on whitespace runs and dropped any
+    # package whose installed version winget could not determine.
     $updates = @()
 
-    try {
-        $wingetPath = Get-Command winget -ErrorAction SilentlyContinue
-        if (-not $wingetPath) { return $updates }
+    $wingetResult = Get-WingetUpgrades -IncludeUnknown
 
-        $wingetOutput = winget upgrade 2>&1 | Out-String
-        $lines = $wingetOutput -split "`n"
+    if ($wingetResult.Error) {
+        Write-Host "  winget: $($wingetResult.Error)" -ForegroundColor Yellow
+        return $updates
+    }
 
-        $headerFound = $false
+    foreach ($package in $wingetResult.Packages) {
+        $classification = Get-WingetCategory -Name $package.Name
 
-        foreach ($line in $lines) {
-            if ($line -match "^Name\s+Id\s+Version\s+Available") {
-                $headerFound = $true
-                continue
-            }
-
-            if ($line -match "^-+") { continue }
-
-            if ($headerFound -and $line.Trim() -and $line -match "\S+\s+\S+\s+[\d\.]+\s+[\d\.]+") {
-                $parts = $line -split '\s{2,}'
-                if ($parts.Count -ge 4) {
-                    $name = $parts[0].Trim()
-                    $id = $parts[1].Trim()
-                    $current = $parts[2].Trim()
-                    $available = $parts[3].Trim()
-
-                    # Categorize
-                    $category = "Other"
-                    $priority = "low"
-
-                    $securityApps = @("Chrome", "Firefox", "Edge", "VPN", "Proton", "Security", "Brave")
-                    $devTools = @("Git", "Node", "Python", "Visual Studio", "VS Code", "Docker", "Go", "Rust", "Java", "dotnet")
-
-                    foreach ($app in $securityApps) {
-                        if ($name -match $app) {
-                            $category = "Security/Browser"
-                            $priority = "high"
-                            break
-                        }
-                    }
-
-                    if ($category -eq "Other") {
-                        foreach ($app in $devTools) {
-                            if ($name -match $app) {
-                                $category = "Development"
-                                $priority = "medium"
-                                break
-                            }
-                        }
-                    }
-
-                    $updates += @{
-                        id = $id
-                        name = $name
-                        currentVersion = $current
-                        availableVersion = $available
-                        category = $category
-                        priority = $priority
-                    }
-                }
-            }
+        $updates += @{
+            id = $package.Id
+            name = $package.Name
+            currentVersion = $package.CurrentVersion
+            availableVersion = $package.NewVersion
+            category = $classification.Category
+            priority = $classification.Priority
         }
     }
-    catch {}
 
     return $updates
 }
@@ -327,7 +315,9 @@ function Get-CleanableItemsDetailed {
             }
         }
     }
-    catch {}
+    catch {
+        Write-Host "  Could not size the Recycle Bin: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
 
     return $items | Sort-Object { -$_.size }
 }
@@ -365,6 +355,26 @@ function Get-SystemStatus {
     return $status
 }
 
+function Test-WingetPackageId {
+    <#
+    .SYNOPSIS
+        Checks that a package id is one winget currently offers as an upgrade.
+    .DESCRIPTION
+        The id arrives from an HTTP request body, so it is untrusted input that
+        ends up on a command line. Allowing only ids present in the current
+        upgrade list means an attacker cannot introduce an id of their choosing
+        even if the character filter were bypassed. The character check is a
+        second layer, not the primary defence.
+    #>
+    param([string]$Id)
+
+    if ([string]::IsNullOrWhiteSpace($Id)) { return $false }
+    if ($Id -notmatch '^[A-Za-z0-9][A-Za-z0-9._+\-]{0,127}$') { return $false }
+
+    $offered = Get-AppUpdatesDetailed
+    return [bool]($offered | Where-Object { $_.id -eq $Id })
+}
+
 function Invoke-UpdateAction {
     param(
         [string]$Type,
@@ -385,11 +395,38 @@ function Invoke-UpdateAction {
         }
         "apps" {
             if ($Ids -and $Ids.Count -gt 0) {
-                # Update specific apps
-                $idList = $Ids -join ","
-                Start-Process PowerShell -ArgumentList "-ExecutionPolicy Bypass -Command `"foreach (`$id in '$idList' -split ',') { winget upgrade --id `$id --accept-source-agreements --accept-package-agreements }`"; pause"
+                # Ids were previously joined into a string and interpolated into
+                # a -Command block. An id containing a single quote closed the
+                # string and ran arbitrary commands, so any web page the user had
+                # open could POST here and execute code. Ids are now validated
+                # against the live upgrade list and passed as discrete arguments,
+                # never as text to be parsed.
+                $validIds = @()
+                $rejectedIds = @()
+
+                foreach ($id in $Ids) {
+                    if (Test-WingetPackageId -Id $id) { $validIds += $id }
+                    else { $rejectedIds += $id }
+                }
+
+                if ($rejectedIds.Count -gt 0) {
+                    Write-Host "  Rejected $($rejectedIds.Count) package id(s) not present in the current upgrade list" -ForegroundColor Yellow
+                }
+
+                if ($validIds.Count -eq 0) {
+                    $result.message = "None of the requested package ids are available to upgrade"
+                    return $result
+                }
+
+                foreach ($id in $validIds) {
+                    Start-Process -FilePath "winget" -ArgumentList @(
+                        'upgrade', '--id', $id, '--exact',
+                        '--accept-source-agreements', '--accept-package-agreements'
+                    )
+                }
+
                 $result.success = $true
-                $result.message = "Updating $($Ids.Count) application(s)"
+                $result.message = "Updating $($validIds.Count) application(s)"
             }
             else {
                 # Launch interactive updater
@@ -425,6 +462,53 @@ function Invoke-UpdateAction {
 # HTTP SERVER
 # ============================================
 
+function Resolve-StaticFilePath {
+    <#
+    .SYNOPSIS
+        Resolves a requested static file, refusing anything outside its folder.
+    .DESCRIPTION
+        The request path was previously concatenated straight onto the folder
+        name, so "/css/../../../../Windows/win.ini" resolved to a file well
+        outside the dashboard and was served. The resolved full path is now
+        required to sit under the intended directory.
+    #>
+    param(
+        [string]$BaseDirectory,
+        [string]$RelativePath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RelativePath)) { return $null }
+
+    try {
+        $decoded = [System.Uri]::UnescapeDataString($RelativePath)
+    }
+    catch {
+        return $null
+    }
+
+    if ($decoded.Contains([char]0)) { return $null }
+
+    $baseFull = [System.IO.Path]::GetFullPath($BaseDirectory)
+    if (-not $baseFull.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+        $baseFull += [System.IO.Path]::DirectorySeparatorChar
+    }
+
+    try {
+        $candidate = [System.IO.Path]::GetFullPath((Join-Path $baseFull $decoded))
+    }
+    catch {
+        return $null
+    }
+
+    if (-not $candidate.StartsWith($baseFull, [StringComparison]::OrdinalIgnoreCase)) {
+        return $null
+    }
+
+    if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { return $null }
+
+    return $candidate
+}
+
 function Start-HttpServer {
     param([int]$Port)
 
@@ -457,7 +541,20 @@ function Start-HttpServer {
         return
     }
 
-    Start-Process "http://localhost:$currentPort"
+    # Config\dashboard-settings.json has always carried an AutoOpenBrowser flag
+    # that nothing read. It is honoured now, and -NoBrowser overrides it.
+    $autoOpen = $true
+    if ($null -ne $dashboardConfig -and $null -ne $dashboardConfig.Server.AutoOpenBrowser) {
+        $autoOpen = [bool]$dashboardConfig.Server.AutoOpenBrowser
+    }
+    if ($NoBrowser) { $autoOpen = $false }
+
+    if ($autoOpen) {
+        Start-Process "http://localhost:$currentPort"
+    }
+    else {
+        Write-Host "  Browser not opened automatically." -ForegroundColor Gray
+    }
 
     Write-Host ""
     Write-Host "  Press Ctrl+C to stop the dashboard" -ForegroundColor Gray
@@ -472,18 +569,40 @@ function Start-HttpServer {
             $path = $request.Url.LocalPath
             $method = $request.HttpMethod
 
-            # CORS and Cache headers
-            $response.Headers.Add("Access-Control-Allow-Origin", "*")
-            $response.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-            $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type")
+            # No Access-Control-Allow-Origin. The page is served from this same
+            # origin so it never needed CORS, and the previous wildcard let any
+            # site the user was browsing read these responses. Without it the
+            # browser blocks cross-origin reads outright.
             $response.Headers.Add("Cache-Control", "no-cache, no-store, must-revalidate")
             $response.Headers.Add("Pragma", "no-cache")
             $response.Headers.Add("Expires", "0")
+            $response.Headers.Add("X-Content-Type-Options", "nosniff")
+            $response.Headers.Add("Referrer-Policy", "no-referrer")
 
+            # Cross-origin preflights are refused rather than approved.
             if ($method -eq "OPTIONS") {
-                $response.StatusCode = 200
+                $response.StatusCode = 405
                 $response.Close()
                 continue
+            }
+
+            # Every API route requires the token that was injected into the page
+            # at load time. A cross-origin page cannot read our HTML, so it
+            # cannot obtain the token, which stops a malicious site from POSTing
+            # actions into this server on the user's behalf.
+            if ($path -like "/api/*") {
+                $providedToken = $request.Headers["X-Dashboard-Token"]
+
+                if ($providedToken -ne $SessionToken) {
+                    Write-Host "  Rejected unauthenticated $method $path from $($request.RemoteEndPoint)" -ForegroundColor Yellow
+                    $response.StatusCode = 403
+                    $buffer = [System.Text.Encoding]::UTF8.GetBytes('{"error":"Invalid or missing dashboard token"}')
+                    $response.ContentType = "application/json"
+                    $response.ContentLength64 = $buffer.Length
+                    $response.OutputStream.Write($buffer, 0, $buffer.Length)
+                    $response.Close()
+                    continue
+                }
             }
 
             $content = ""
@@ -498,7 +617,9 @@ function Start-HttpServer {
                 try {
                     $body = $bodyText | ConvertFrom-Json
                 }
-                catch {}
+                catch {
+                    Write-Host "  Ignoring malformed JSON body on $method $path" -ForegroundColor Yellow
+                }
             }
 
             switch -Regex ($path) {
@@ -506,22 +627,33 @@ function Start-HttpServer {
                     $indexPath = Join-Path $ScriptRoot "index.html"
                     if (Test-Path $indexPath) {
                         $content = Get-Content $indexPath -Raw -Encoding UTF8
+                        # Hand this session's token to the page. Only a document
+                        # served from here receives it.
+                        $content = $content.Replace("{{DASHBOARD_TOKEN}}", $SessionToken)
                     }
                 }
 
                 "^/css/(.+)$" {
-                    $cssPath = Join-Path $ScriptRoot "css\$($Matches[1])"
-                    if (Test-Path $cssPath) {
+                    $cssPath = Resolve-StaticFilePath -BaseDirectory (Join-Path $ScriptRoot "css") -RelativePath $Matches[1]
+                    if ($cssPath) {
                         $content = Get-Content $cssPath -Raw -Encoding UTF8
                         $contentType = "text/css"
+                    }
+                    else {
+                        $response.StatusCode = 404
+                        $content = "Not Found"
                     }
                 }
 
                 "^/js/(.+)$" {
-                    $jsPath = Join-Path $ScriptRoot "js\$($Matches[1])"
-                    if (Test-Path $jsPath) {
+                    $jsPath = Resolve-StaticFilePath -BaseDirectory (Join-Path $ScriptRoot "js") -RelativePath $Matches[1]
+                    if ($jsPath) {
                         $content = Get-Content $jsPath -Raw -Encoding UTF8
                         $contentType = "application/javascript"
+                    }
+                    else {
+                        $response.StatusCode = 404
+                        $content = "Not Found"
                     }
                 }
 
@@ -584,8 +716,16 @@ function Start-HttpServer {
             $response.Close()
         }
     }
-    catch {}
+    catch {
+        # Ctrl+C closes the listener mid-GetContext, which is expected shutdown.
+        if ($_.Exception -isnot [System.Net.HttpListenerException]) {
+            Write-Host ""
+            Write-Host "  Dashboard stopped after an error: $($_.Exception.Message)" -ForegroundColor Red
+        }
+    }
     finally {
+        Write-Host ""
+        Write-Host "  Shutting down dashboard..." -ForegroundColor Gray
         $listener.Stop()
         $listener.Close()
     }

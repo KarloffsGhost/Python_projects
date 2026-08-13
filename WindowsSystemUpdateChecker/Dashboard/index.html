@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>System Maintenance Dashboard</title>
+    <!-- Replaced with this session's token when Start-Dashboard.ps1 serves the
+         page. Every /api request must carry it, which is what stops another
+         site in the browser from driving this dashboard. -->
+    <meta name="dashboard-token" content="{{DASHBOARD_TOKEN}}">
     <link rel="stylesheet" href="/css/dashboard.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
